@@ -17,6 +17,8 @@
 #include "debug.h"
 #include "resource.h"
 #include <archive.h>
+#include <archive_entry.h>
+#include <ctype.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -25,25 +27,43 @@
 
 /*
  * Clips any non-printing characters off the end of a string
- * Mainly for newlines
- * We should usually call this on a string before sending it
- * to calculate_sid
+ * Mainly for stripping newlines in user-input text
  */
 void clip_string(char *a)
 {
-	int i = 0;
-	for (; isprint((int)a[i]); ++i);
-	/*
-	 * If a string falls in a forest, and we clip up to the terminating
-	 * null, do we care?
-	 */
-	a[i] = '\0';
+    int i = 0;
+    for (; isprint((int)a[i]); ++i);
+    /*
+     * If a string falls in a forest, and we clip up to the terminating
+     * null, do we care?
+     */
+    a[i] = '\0';
+}
+
+/*
+ * Gets the extension of a filename
+ * everything after the last dot, or everything if there is no dot
+ * Used to detect filetype
+ */
+char *get_ext(char *a)
+{
+    char *ext = a;
+    char *temp = a;
+    while (*(++temp)) {
+        if (*temp == '.') {
+            ext = temp;
+        }
+    }
+    
+    debug("get_ext result:");
+    debug2(a, ext);
+    return ext;
 }
 
 /* 
  * Jenkins one-at-a-time hash 
  * NOTE TO SELF: If I ever change this algorithm, be sure
- * to change the precalculated hashes below!
+ * to change the precalculated hashes in resource.h!
  */
 sid_t calculate_sid(char *string)
 {
@@ -54,7 +74,7 @@ sid_t calculate_sid(char *string)
      * this saves time having to run strlen
      */
 
-	/* Not much to say here. This is the algorithm. */
+    /* Not much to say here. This is the algorithm. */
     for (hash = i = 0; string[i] != '\0'; ++i) {
         hash += string[i];
         hash += (hash << 10);
@@ -67,193 +87,387 @@ sid_t calculate_sid(char *string)
     return (sid_t)hash;
 }
 
-/* 
- * Precalculated hashes, used to detect filetype from extension
- * e.g. PNG_HASH is the result of calculate_sid(".png")
+/* arclist chain */
+arclist *arc_head = NULL;
+arclist *arc_tail = NULL;
+pthread_mutex_t arc_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* For creating human-readable description of what I'm doing */
+pthread_mutex_t load_lock = PTHREAD_MUTEX_INITIALIZER;
+char doing[40];
+
+/* Get an archive from the arclist chain */
+inline arclist *_get_arc_from_chain(sid_t id)
+{
+    arclist *temparc;
+    
+    pthread_mutex_lock(&arc_lock);
+    for(temparc = arc_head; temparc != NULL && temparc->id != id;
+        temparc = temparc->next);
+    pthread_mutex_unlock(&arc_lock);
+    return temparc;
+}
+
+/* Load an archive */
+arclist *load_arc(char *arcname)
+{
+    int i, r;
+    arclist *newarclist;
+    resource *newresource, *tempres;
+    sid_t reshash, temphash;
+    void *tempdat;
+    char *tempname;
+    
+    struct archive *newarc;
+    struct archive_entry *entry;
+    
+    debug2("Starting to load archive", arcname);
+    
+    pthread_mutex_lock(&load_lock);
+    
+    temphash = calculate_sid(arcname);
+    /* Do we already have this arclist in memory? */
+    if ((newarclist = _get_arc_from_chain(temphash))) {
+        debug("Archive found in arc chain");
+        /* And is it loaded? */
+        pthread_mutex_lock(&(newarclist->_lock));
+        if(newarclist->loaded) {
+            debug("Archive is loaded, we're done.");
+            /* Then we're golden */
+            pthread_mutex_unlock(&(newarclist->_lock));
+            return newarclist;
+        }
+        /* still don't need to make a new one at least */
+    }
+    else {
+        /* Make an arclist */
+        sprintf(doing, "Initializing archive %s", arcname);
+        debug(doing);
+        
+        newarclist = malloc(sizeof(arclist));
+        panic2(newarclist, "Could not allocate memory for new arclist:", arcname);
+        
+        /* Prepare the lock */
+        newarclist->_lock = PTHREAD_MUTEX_INITIALIZER;
+                                        
+        /* Lock it */
+        pthread_mutex_lock(&(newarclist->_lock));
+        
+        /* Prepare other stuff */
+        strcpy(newarclist->name, arcname);
+        newarclist->id = temphash;
+        /* wherever it goes, this is correct */
+        newarclist->next = NULL;
+        for (i = 0; i < ARCLIST_HASH_SIZE; ++i) {
+            newarclist->map[i] = NULL;
+        }
+        
+        /* Add it to the arclist chain */
+        pthread_mutex_lock(&arc_lock);
+        if (arc_head) {
+            /* 
+             * List is not currently empty - add it
+             * We COULD sort these, but there are only like seven
+             * archives, so why bother?
+             */
+             arc_tail->next = newarclist;
+             arc_tail = newarclist;
+        }
+        else {
+            /* List is empty - make it */
+            arc_head = newarclist;
+            arc_tail = newarclist;
+        }
+        pthread_mutex_unlock(&arc_lock);
+    }
+    /* Start loading the archive */
+    sprintf(doing, "Opening up archive %s", arcname);
+    debug(doing);
+    newarc = archive_read_new();
+    /* All archives are gzipped tarballs */
+    
+    /* 
+     * "libarchive version 3 is just around the corner! Honest!"
+     *  -- Libarchive developers, Mar 2010
+     */
+#if ARCHIVE_VERSION_NUMBER < 3000000
+    archive_read_support_compression_gzip(newarc);
+#else
+    archive_read_support_filter_gzip(newarc);
+#endif
+
+    archive_read_support_format_tar(newarc);
+    
+    /* Open it up */
+    r = archive_read_open_filename(newarc, arcname, 10240);
+    panic2(r==ARCHIVE_OK, "Couldn't open archive", arcname);
+    
+    /*
+     * Start reading
+     * Yes, we're sending a pointer to the pointer to the entry.
+     * This is by design. I have no idea why.
+     */
+    while (archive_read_next_header(newarc, &entry) == ARCHIVE_OK) {
+        tempname = (char*) archive_entry_pathname(entry);
+        
+        sprintf(doing, "Reading in archive entry %s", tempname);
+        debug(doing);
+        
+        /* Set up new resource entry */
+        newresource = malloc(sizeof(resource));
+        panic2(newresource, "Couldn't allocate memory for new resource",
+                                                                    tempname);
+                                                                    
+        newresource->_lock = PTHREAD_MUTEX_INITIALIZER;
+        
+        /* Lock it */
+        pthread_mutex_lock(&(newresource->_lock));
+        
+        /* 
+         * Copy over some stuff
+         * Note: libarchive doesn't guarantee that the size is
+         * known, but the tar format does, so we'll assume that
+         * if archive_entry_size returns 0, then the file really
+         * does have a size of zero. Although I'm not sure why
+         * we would ever need that...
+         */
+        strncpy(newresource->name, archive_entry_pathname(entry), 15);
+        (newresource->name)[15] = '\0';
+        reshash = calculate_sid(newresource->name);
+        newresource->id = reshash;
+        newresource->size = archive_entry_size(entry);
+        newresource->data = NULL;
+        
+        debug2("Copied over filepath:", newresource->name);
+        debugn("File is size", newresource->size);
+        debugn("File has SID", (int)newresource->id);
+        debugn("File will be stored in map slot", reshash%ARCLIST_HASH_SIZE);
+        
+        /* Try and determine filetype */
+        temphash = calculate_sid(get_ext(newresource->name));
+        switch (temphash) {
+            case PNG_HASH:
+                debug("Filetype is PNG");
+                newresource->type = RES_IMAGE;
+                break;
+            case BIN_HASH:
+                debug("Filetype is BIN");
+                newresource->type = RES_TEXTURE;
+                break;
+            case LUA_HASH:
+                debug("Filetype is LUA");
+                newresource->type = RES_SCRIPT;
+                break;
+            case TXT_HASH:
+                debug("Filetype is TXT");
+                newresource->type = RES_STRING;
+                break;
+            case MAP_HASH:
+                debug("Filetype is MAP");
+                newresource->type = RES_MAP;
+                break;
+            default:
+                debug("Filetype is unrecognized (this is not an error)");
+                newresource->type = RES_OTHER;
+        }
+        
+        /* Store it in arclist */
+        tempres = newarclist->map[reshash%ARCLIST_HASH_SIZE];
+        if (tempres) {
+            /* List is not empty - add it */
+            /* We don't care about sorting this one either */
+            for (; tempres != NULL; tempres = tempres->next);
+            
+            newresource->next = tempres->next;
+            tempres->next = newresource;
+        }
+        else {
+            /* list is empty - make it */
+            newarclist->map[reshash%ARCLIST_HASH_SIZE] = newresource;
+            newresource->next = NULL;
+        }
+        
+        /* Now we need to load this entry, pretty standard stuff */
+        tempdat = malloc((size_t)newresource->size);
+        panic2(tempdat, "Couldn't allocate memory to load resource",
+                newresource->name);
+        archive_read_data(newarc, tempdat, (size_t)newresource->size);
+        
+        newresource->data = tempdat;
+        
+        /* Finally, unlock */
+        pthread_mutex_unlock(&(newresource->_lock));
+    }
+    /* Everything's loaded, just need to clean some stuff */
+    sprintf(doing, "Cleaning up internal copy of %s", arcname);
+    debug(doing);
+    
+    /* 
+     * "libarchive version 3 is just around the corner! Honest!"
+     *  -- Libarchive developers, Mar 2010
+     */
+#if ARCHIVE_VERSION_NUMBER < 3000000
+    archive_read_finish(newarc);
+#else
+    archive_read_free(newarc);
+#endif
+
+    newarclist->loaded = 1;
+    pthread_mutex_unlock(&(newarclist->_lock));
+    
+    /* clear this out */
+    doing[0] = '\0';
+    debug2("Done loading archive", arcname);
+    pthread_mutex_unlock(&load_lock);
+    return newarclist;
+}
+
+/* Internal function to free an archive */
+void _free_arc(arclist *arc)
+{
+    int i;
+    resource *tempres, *nextres;
+    
+    /* Is it freed already? */
+    if (!(arc->loaded)) {
+    }
+    else {
+        /* Lock it */
+        pthread_mutex_lock(&(arc->_lock));
+        
+        /* Free all resources */
+        debug2("Freeing resources in arclist", arc->name);
+        for (i = 0; i < ARCLIST_HASH_SIZE; ++i) {
+            tempres = arc->map[i];
+            while (tempres) {
+                /* Free everything */
+                debug2("Freeing resource", tempres->name);
+                free(tempres->data);
+                
+                /* Free the resource itself, need to shuffle around a bit */
+                nextres = tempres->next;
+                free(tempres);
+                tempres = nextres;
+            }
+            arc->map[i] = NULL;
+        }
+    
+        /* Clean up */
+        arc->loaded = 0;
+        pthread_mutex_unlock(&(arc->_lock));
+        
+        debug2("Done freeing archive", arc->name);
+    }
+} 
+
+/*
+ * Free an archive
+ * Note that the arclist struct STAYS IN MEMORY, but all the resources therein
+ * are freed.
  */
-#define PNG_HASH 0x5c4046f0
-#define BIN_HASH 0x090e5a36
-#define LUA_HASH 0xf4af8b0f
-#define TXT_HASH 0x1c6ca03e
-#define MAP_HASH 0x0dc0b9a8
+void free_arc(char *arcname)
+{
+    _free_arc(_get_arc_from_chain(calculate_sid(arcname)));
+}
 
-/* TODO: Finish this gunk */
-///* 
- //* This is used by the resource thread to keep track of 
- //* what it needs to do 
- //*/
-//typedef enum {
-	//RES_STATE_LOAD_ARC;
-	//RES_STATE_LOAD_RES;
-	//RES_STATE_FREE_ARC;
-	//RES_STATE_FREE_RES;
-	//RES_STATE_GARBAGE;
-	//RES_STATE_STOP;
-//} action_type;
+/* Retrieve something that's been loaded */
+arclist *get_arc(char *arcname)
+{
+    arclist *temp;
+    sid_t archash;
+    
+    archash = calculate_sid(arcname);
+    temp = _get_arc_from_chain(archash);
+    if (temp) {
+        /* If it's being worked on, wait */
+        pthread_mutex_lock(&(temp->_lock));
+        pthread_mutex_unlock(&(temp->_lock));
+        return temp;
+    }
+    else {
+        /* We need to load it */
+        warn2(0, "Requested arclist was not loaded, loading it now:", arcname);
+        return load_arc(arcname);
+    }
+}
 
-//typedef struct action action;
-//struct action {
-	//action *next;
-	
-	//action_type type;
+resource *get_res(char *arcname, char *resname)
+{
+    arclist *temparc;
+    resource *tempres;
+    sid_t reshash;
+    
+    temparc = get_arc(arcname); 
+    /* Was the arclist freed? */
+    if (!(temparc->loaded)) {
+        /* We know we want to warn here */
+        warn2(0, "Arclist was loaded but has since been freed, reloading:",
+                arcname);
+        temparc = load_arc(arcname);
+    }
+    
+    reshash = calculate_sid(resname);
+    /* Look for the resource we want */
+    pthread_mutex_lock(&(temparc->_lock));
+    for (tempres = temparc->map[reshash%ARCLIST_HASH_SIZE];
+         tempres != NULL && tempres->id != reshash; tempres = tempres->next);
+    pthread_mutex_unlock(&(temparc->_lock));
+    
+    if (tempres) {
+        /* If it's being worked on, wait */
+        pthread_mutex_lock(&(tempres->_lock));
+        pthread_mutex_unlock(&(tempres->_lock));
+    }
+    warn2(tempres,
+            "Arclist was loaded but it didn't have the requested resource:",
+            resname);
+    return tempres;
+}
 
-	//char[16] arc;
-	//char[16] res;
-//};
+/* Initialize stuff needed by all resource functions */
+void init_resources(void)
+{
+    /*
+     * ... We don't actually do anything here
+     * This is just here for legacy, and because having stop_ without init_
+     * feels weird
+     */
+    
+    debug("Resource loader intialized");
+}
 
-//action *queue_head;
-//action *queue_tail;
-//struct mutex_t *queue_lock;
-
-
-
-///* This is used to keep track of loading information */
-///* Progress goes from 0 to 32767 - easily enough granularity */
-//int progress;
-///* Human-readable description of what I'm doing */
-//char[40] doing;
-
-///* Used internally to add an action to the action queue */
-//void _add_action_to_queue(action_type type, char *arc, char *res)
-//{
-	//action *new;
-	//char *newarc, *newres;
-	//const char nullstr[16] = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-	
-	//action *new = malloc(sizeof(action));
-	//panic(new, "Could not allocate memory for new resource action");
-	///* have to make copies, these may be stack-allocated */
-	//char *newarc = malloc(16);
-	//char *newres = malloc(16);
-	///* might be NULLs in here */
-	//strncpy(newarc, (arc ? arc : nullstr), 15);
-	//strncpy(newres, (res ? res : nullstr), 15);
-	///* 
-	 //* strncpy doesn't guarantee a null-terminator, hence copying
-	 //* only 15 characters and setting it explicitly here
-	 //*/
-	//newarc[15]='\0';
-	//newres[15]='\0';
-	
-	///* prepare new */
-	//new -> next = NULL;
-	//new -> type = type;
-	//new -> arc = newarc;
-	//new -> res = newres;
-	
-	//pthread_mutex_lock(queue_lock);
-	//if (queue_head) {
-		///* Queue is nonempty, just need to add the element */
-		//queue_tail -> next = new;
-		//queue_tail = new;
-	//}
-	//else {
-		///* Queue is empty, need to fill it up */
-		//queue_head = new;
-		//queue_tail = new;
-	//}
-	//pthread_mutex_unlock(queue_lock);
-//}
-
-
-
-///*
- //* These functions just add actions to the queue, the thread function
- //* actually performs the loading and unloading
- //*/
- 
-//void load_arc(char *arcname)
-//{
-	//_add_action_to_queue(RES_STATE_LOAD_ARC, arcname, NULL);
-//}
-
-//void free_arc(char *arcname)
-//{
-	//_add_action_to_queue(RES_STATE_FREE_ARC, arcname, NULL);
-//}
-
-//void load_res(char *arcname, char *resname)
-//{
-	//_add_action_to_queue(RES_STATE_LOAD_RES, arcname, resname);
-//}
-
-//void free_res(char *arcname, char *resname)
-//{
-	//_add_action_to_queue(RES_STATE_FREE_RES, arcname, resname);
-//}
-
-//void garbage_collect(void)
-//{
-	//_add_action_to_queue(RES_STATE_GARBAGE, NULL, NULL);
-//}
-
-//extern arclist *get_arc(char *arcname);
-//extern resource *get_res(char *arcname, char *resname);
-	
-//const struct timespec sleeptime = {0,10000000L} /* 1/100 sec */
-
-///* Main resource thread loop, we don't use arg */
-//void _resource_thread(void *arg)
-//{
-	//int r;
-	//action *temp;
-	//arclist *newarclist;
-	//resource *newresource;
-	//struct archive *newarc;
-	//struct archive_entry *newentry;
-	
-	///* Main loop */
-	//while (1) {
-		//pthread_mutex_lock(queue_lock);
-		//if (queue_head) {
-			//switch(queue_head -> type) {
-				//case RES_STATE_LOAD_ARC:
-					///* Load an archive */
-					//newarc = archive_read_new();
-					
-					///* All archives are ncompressed tarballs */
-					//archive_read_support_filter_compress(newarc);
-					//archive_read_support_format_tar(newarc);
-					
-					///* Open it up */
-					//r = archive_read_open_filename(newarc,
-										//queue_head->arc, 10240);
-					//panic2(r==ARCHIVE_OK, "Couldn't open archive: ",
-											//queue_head->arc);
-					
-					
-					//break;
-				
-			//}
-			
-			///* clear the memory used by the action */
-			//temp = queue_head;
-			//queue_head = queue_head->next;
-			//free(temp -> arc);
-			//free(temp -> res);
-			//free(temp);
-		//}
-		//pthread_mutex_unlock(queue_lock);
-		///* take a nap */
-		//nanosleep(&sleeptime, NULL);
-	//}
-//}
-
-///* Starting or stopping the thread */
-//void init_resources(pthread_t *t)
-//{
-	//int r;
-	
-	///* Intitialize queue mutex*/
-	//r = pthread_mutex_init(queue_lock, NULL);
-	//panic(!r, "Could not initialize queue_lock mutex");
-	
-	///* Create thread */
-	//r = pthread_create(t, NULL, _resource_thread, NULL);
-	//panic(!r, "Could not create resource loading thread");
-//}
-
-//void stop_resources(void)
-//{
-	//_add_action_to_queue(RES_STATE_STOP, NULL, NULL);
-//}
+void stop_resources(void)
+{
+    arclist *temparc, *nextarc;
+    
+    /*
+     * Clear EVERYTHING
+     * We can safely assume that this will be called at a time when
+     * nothing else needs anything we have loaded
+     * Thus, we may hack away with impunity
+     * Just to be safe, though, we'll still lock/unlock the arclist chain
+     */
+    
+    pthread_mutex_lock(&arc_lock);
+    temparc = arc_head;
+    while (temparc) {
+        debug2("Clearing arclist", temparc->name);
+        
+        /* Is it still loaded? If so, free it */
+        if (temparc->loaded) {
+            debug2("Arclist still loaded, freeing it:", temparc->name);
+            _free_arc(temparc);
+        }
+        
+        /* Now go to work on its guts */
+        debug2("Freeing arclist memory:", temparc->name);
+        nextarc = temparc->next;
+        free(temparc);
+        temparc = nextarc;
+        
+        debug("Arclist freed (can't display name, it's gone)");
+    }
+    pthread_mutex_unlock(&arc_lock);
+    
+    debug("Resources stopped and ready for engine closure.");
+}

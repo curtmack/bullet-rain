@@ -2,6 +2,8 @@
 bullet-rain is distributed under the MIT license.
 This means that it is free software and may be used for both academic
 and commercial purposes at no cost.
+This is not the same as the GNU GPL; in particular, there is no
+requirement to distribute source code.
 The terms of this license follow.
 ------------------------------------------------------------------------
 
@@ -32,6 +34,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 libarchive is free software distributed under the terms of the New BSD
 license.
 The following is reproduced here as per the terms of that license:
+(note that <author(s)> is copied from 
 ------------------------------------------------------------------------
 
 Copyright (c) 2003-2009 <author(s)>

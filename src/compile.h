@@ -31,18 +31,11 @@
 
 /* Size of hash map used to store resources */
 #define ARCLIST_HASH_SIZE 1024
-/* 
- * Paranoid hash map - accomodate hash collisions, but requires full
- * string checks whenever a hash match is detected
- * Our hashing algorithm has pretty even distribution over the
- * full 32-bit hash space, so this is likely not needed.
- */
-/* #define PARANOID_HASH */
 
 /* Compile system tests rather than the usual main() */
 #define SYSTEM_TEST
 
 /* Version string */
-#define ENGINE_VERSION "prealpha"
+#define ENGINE_VERSION "0.0.0.1"
 
 #endif /* !def COMPILE_H */

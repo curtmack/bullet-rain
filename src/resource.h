@@ -37,85 +37,88 @@
  * code needs to keep track of a resource for later retrieval, it will
  * store the pointer to the resource structure.
  *
- * Unloading a resource will free the memory used for its data and
- * resource structure. Unloading an archive will free the memory used
- * for all of its loaded resources, all of its arcentries, and its
- * arclist structure.
+ * Unloading a resource will free the memory used for its data.
+ * Unloading an archive will free the memory used for all of its loaded
+ * resources, all of its resource entries, and its arclist structure.
  */
 
 typedef uint32_t sid_t;
 
+/*
+ * Enum for telling us what resource type we're looking at
+ * Some of these might be handled differently when being loaded, so this
+ * is necessary.
+ */
 typedef enum {
     RES_IMAGE,   /* image intended to be used as a GUI graphic - PNG */
     RES_TEXTURE, /*     image intended to be used in-game      - BIN */
     RES_SCRIPT,  /*                 Lua script                 - LUA */
     RES_STRING,  /*         some kind of string resource       - TXT */
     RES_MAP,     /*               level tile data              - MAP */
-    RES_OTHER    /*  no idea, hope the calling function knows  - ??? */
+    RES_OTHER    /*  no idea, hope the code that uses it knows - ??? */
 } restype;
+
+/* 
+ * Precalculated hashes, used to detect filetype from extension
+ * e.g. PNG_HASH is the result of calculate_sid(".png")
+ */
+#define PNG_HASH 0x5c4046f0
+#define BIN_HASH 0x090e5a36
+#define LUA_HASH 0xf4af8b0f
+#define TXT_HASH 0x1c6ca03e
+#define MAP_HASH 0x0dc0b9a8
 
 typedef struct resource resource;
 struct resource {
     resource *next;
     char      name[16];
-    sid_t     hash;
-    int       size;
+    sid_t     id;
     restype   type;
-    int       refcount;
     void     *data;
+    int64_t   size; /* yeah that's the form libarchive gives it to us in */
+    
+    pthread_mutex_t _lock;
 };
 
 typedef struct arclist arclist;
 struct arclist {
-	struct archive *arc;
-	
     arclist  *next;
     sid_t     id;
-    char      arcname[16];
-    int       refcount;
+    char      name[16];
+    int       loaded;
     resource *map[ARCLIST_HASH_SIZE];
     
-    struct mutex_t *_lock;
+    pthread_mutex_t _lock;
 };
 
 extern void clip_string(char *a);
+extern char *get_ext(char *a);
 extern sid_t calculate_sid(char *string);
 
 /* Start and stop resources thread */
-extern void init_resources(pthread_t *t);
+extern void init_resources(void);
 extern void stop_resources(void);
 
-/* Get progress bar information for loading screen */
-extern int get_progress(char *doing);
+/* Get progress information for loading screen */
+extern void get_progress(char *doing);
 
 /*
- * All of these functions just add an action to the action queue,
- * except the get_ functions, which block until the arc or res is
- * loaded if necessary. The get_ functions also increase the refcount..
- * 
- * Garbage collect frees all resources and arclists that have a
- * refcount of zero.
- * 
- * Note that when a resource is freed, the struct itself will not
- * be destroyed. Only the data is unloaded. The structs are freed
- * when stop_resources is called.
+ * load_arc loads an archive,  The get_ functions block
+ * until the arc or res is loaded if necessary.
  *
  * OTHER SYSTEMS SHOULD NOT MODIFY ARCLISTS OR RESOURCES. ONLY
  * THE FUNCTIONS IN THIS FILE SHOULD MODIFY THEM, AND ONLY AFTER
  * CHECKING THE LOCK.
  * Other systems may, however, freely access the data loaded in
  * a resource, which is guaranteed to not be modified unless the
- * memory is relinquished.
+ * memory is relinquished (in which case we're doing something wrong
+ * anyway).
  */
 
-extern void     load_arc(char *arcname);
-extern void     free_arc(char *arcname);
+extern arclist *load_arc(char *arcname);
+extern void free_arc(char *arcname);
+
 extern arclist *get_arc(char *arcname);
-
-extern void      load_res(char *arcname, char *resname);
-extern void      free_res(char *arcname, char *resname);
 extern resource *get_res(char *arcname, char *resname);
-
-extern void garbage_collect(void);
 
 #endif /* def RESOURCE_H */

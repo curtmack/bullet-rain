@@ -19,6 +19,7 @@
 
 #ifdef SYSTEM_TEST
 
+#include "debug.h"
 #include "fixed.h"
 #include "resource.h"
 #include <ctype.h>
@@ -29,12 +30,14 @@
 
 void fixed_test(void);
 void hash_test(void);
+void res_test(void);
 
-#define MAIN_MENU_SIZE 6
+#define MAIN_MENU_SIZE 7
 const char menu[MAIN_MENU_SIZE][32] = {
     "Main menu:",
     " 1. Fixed-point arithmetic test",
-	" 2. String hashing test",
+    " 2. String hashing test",
+    " 3. Resource loading test",
     " q. Quit",
     "",
     "Your choice:"
@@ -47,6 +50,8 @@ int main(int nargs, char *args[])
     char choice[4];
 
     srand((int) time(NULL));
+    
+    init_resources();
 
     puts("BULLET RAIN ENGINE TEST");
     printf("Engine version %s\n", ENGINE_VERSION);
@@ -56,19 +61,22 @@ int main(int nargs, char *args[])
             puts(menu[i]);
         }
 
-		/*
-		 * We have to get in too many characters
-		 * due to weirdness with the program reading
-		 * in the newline
-		 */
+        /*
+         * We have to get in too many characters
+         * due to weirdness with the program reading
+         * in the newline
+         */
         fgets(choice, 4, stdin);
         switch (choice[0]) {
             case '1':
                 fixed_test();
                 break;
             case '2':
-				hash_test();
-				break;
+                hash_test();
+                break;
+            case '3':
+                res_test();
+                break;
             case 'q':
                 finished = 1;
                 break;
@@ -76,7 +84,10 @@ int main(int nargs, char *args[])
                 printf("Invalid choice %c\n", choice[0]);
         }
     }
-	return 0;
+    
+    stop_resources();
+    
+    return 0;
 }
 
 inline void print_fixed(fixed_t a)
@@ -113,26 +124,73 @@ void fixed_test(void)
 
 void hash_test(void)
 {
-	char a[64];
-	sid_t hash;
-	
-	while (1) {
-		puts("Enter a string to hash (blank line quits):");
-		fgets(a, 64, stdin);
-		clip_string(a);
-		if (a[0] == '\0') {
-			puts("Okay, exiting hash test.");
-			break;
-		}
-		
-		hash = calculate_sid(a);
-		
-		/* 
-		 * note: this may cause warnings if uint32_t is not vanilla int
-		 * but it won't hurt anything, god willing
-		 */
-		printf("SID of '%s' is %08x\n", a, (uint32_t)hash);
-	}
+    char a[64];
+    sid_t hash;
+    
+    while (1) {
+        puts("Enter a string to hash (blank line quits):");
+        fgets(a, 64, stdin);
+        clip_string(a);
+        if (a[0] == '\0') {
+            puts("Okay, exiting hash test.");
+            break;
+        }
+        
+        hash = calculate_sid(a);
+        
+        /* 
+         * note: this may cause warnings if uint32_t is not vanilla int
+         * but it won't hurt anything, god willing
+         */
+        printf("SID of '%s' is %08x\n", a, (uint32_t)hash);
+    }
+}
+
+void print_res(resource *res)
+{
+    /*
+     * We're going to assume we'll never call this unless we know
+     * it's actually printable data
+     */
+    char *a = (char*) res->data;
+    int64_t num = res->size;
+    int i, r;
+    
+    puts("-------BEGIN-------");
+    for (i = 0; i <= num; ++i) {
+        r = (a[i] <= 127);
+        warnn(r, "Character found that was not printable:", (int)a[i]);
+        warnn(r, "It was at location:", i);
+        if (r) putchar(a[i]);
+    }
+    puts("\n--------END--------");
+}
+
+void res_test(void)
+{
+    arclist *arc;
+    resource *res;
+    
+    puts("Loading res/test.tgz");
+    arc = load_arc("res/test.tgz");
+    puts("Loading successful!");
+    
+    puts("Printing contents of file chocolat.txt");
+    res = get_res("res/test.tgz", "chocolat.txt");
+    print_res(res);
+    
+    puts("Freeing archive");
+    free_arc("res/test.tgz");
+    puts("Archive freed!");
+    
+    puts("Getting resource at pocky.txt in a way that should cause a warning");
+    res = get_res("res/test.tgz", "pocky.txt");
+    
+    puts("Printing contents of file pocky.txt");
+    print_res(res);
+    
+    puts("Test done!");
+    puts("Leaving archive in memory.");
 }
 
 #else /* def SYSTEM_TEST */

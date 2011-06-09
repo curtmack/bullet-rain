@@ -24,24 +24,26 @@ Then, you may need to edit the Makefile. All of the definitions should
 be fine as they are, but you might need to tweak the variables at the
 beginning:
 
- - CC:   The name (including path if necessary) of a C compiler. The
-         make process assumes it supports GCC-like commandline switches
-         for specifying output file, compilation mode, etc. In fact,
-         maybe you should just use GCC.
- - LINK: The name of a linker that accepts whatever object format CC
-         spits out. NOTE: This varies for different C compilers. GCC,
-		 for example, requires that you send .o files through gcc
-		 rather than directly through ld, because gcc has some built-in
-		 libraries it passes to ld. In this case, you should use gcc as
-		 both CC and LINK.
- - LIBS: Commandline switches given to the compiler to import the
-         necessary libraries. This should be fine as-is.
- - EXE:  Binary extension. For example, .exe on Windows, nothing on
-         UNIX. Include the dot.
- - BIN:  Directory to put it in. Usually "bin/debug" for debug builds,
-         "bin/release" for release builds.
- - RM:   A program that deletes files specified on its commandline.
-         Used for "make clean." rm or del are the usual options.
+ - CC:     The name (including path if necessary) of a C compiler. The
+           make process assumes it supports GCC-like commandline switches
+           for specifying output file, compilation mode, etc. In fact,
+           maybe you should just use GCC.
+ - CFLAGS: Miscellaneous commandline flags given to CC.
+ - LINK:   The name of a linker that accepts whatever object format CC
+           spits out. NOTE: This varies for different C compilers. GCC,
+           for example, requires that you send .o files through gcc
+           rather than directly through ld, because gcc has some built-in
+           libraries it passes to ld. In this case, you should use gcc as
+           both CC and LINK.
+ - LFLAGS: Miscellaneous commandline flags given to LINK.
+ - LIBS:   Commandline switches given to the compiler to import the
+           necessary libraries. This should be fine as-is.
+ - EXE:    Binary extension. For example, .exe on Windows, nothing on
+           UNIX. Include the dot.
+ - BIN:    Directory to put it in. Usually "bin/debug" for debug builds,
+           "bin/release" for release builds.
+ - RM:     A program that deletes files specified on its commandline.
+           Used for "make clean." rm -f or del are the usual options.
 
 Your version of make will need to understand and accept / as a
 directory separator, even if that's not the native separator for your
