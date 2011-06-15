@@ -254,6 +254,14 @@ arclist *load_arc(char *arcname)
                 debug("Filetype is BIN");
                 newresource->type = RES_TEXTURE;
                 break;
+            case MID_HASH:
+                debug("Filetype is MID");
+                newresource->type = RES_MIDI;
+                break;
+            case OGG_HASH:
+                debug("Filetype is OGG");
+                newresource->type = RES_SOUND;
+                break;
             case LUA_HASH:
                 debug("Filetype is LUA");
                 newresource->type = RES_SCRIPT;
@@ -433,7 +441,7 @@ void init_resources(void)
      * feels weird
      */
     
-    debug("Resource loader intialized");
+    debug("Resource loader initialized");
 }
 
 void stop_resources(void)

@@ -46,33 +46,18 @@ typedef int32_t fixed_t;
  * sign and correctly handles either case
  * i.e. if b is positive it's added, if b is negative it's subtracted
  */
-#define tofixed(a,b) (fixed_t)(((a)<<16) + (b))
+#define tofixed(in,fr) (fixed_t)(((in)<<16) + (fr))
 
 /*
  * Going the other way
  * Things can get a bit tricky with 2's complement, so we
  * double-negative to work around it
  */
-#define intpart(a) (a>=0 ? (int)(a>>16) : -(int)((-a)>>16))
+#define intpart(a) (a>=0 ? (int)((a)>>16) : -(int)((-a)>>16))
 #define fracpart(a) (a>=0 ? (int)(a&0x0000FFFF) : -(int)((-a)&0x0000FFFF))
 
-/* These have to be inlines for the memory used for temp */
-inline fixed_t fixmul(fixed_t a, fixed_t b)
-{
-    int64_t temp;
-
-    temp = (int64_t)a*(int64_t)b;
-    return (fixed_t)(temp >> 16);
-}
-inline fixed_t fixdiv(fixed_t a, fixed_t b)
-{
-    int64_t temp;
-    
-    warn(b!=fixzero, "Division by zero");
-    if (b==fixzero) return a; /* a/0 = a, simpler than panicking */
-    
-    temp = (int64_t)a << 16;
-    return (fixed_t) (temp/(int)b);
-}
+/* These have to be functions for the memory used for temp */
+extern fixed_t fixmul(fixed_t a, fixed_t b);
+extern fixed_t fixdiv(fixed_t a, fixed_t b);
 
 #endif /* !def FIXED_H */

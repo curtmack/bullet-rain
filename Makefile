@@ -9,13 +9,13 @@
 # GCC-ish C compiler
 CC = gcc
 # CC flags
-CFLAGS = -Wall
+CFLAGS = -Wall `sdl-config --cflags`
 # GCC-ish linker
 LINK = gcc
 # LINK flags
-LFLAGS = -Wall
+LFLAGS = -Wall `sdl-config --cflags`
 # Library switches
-LIBS = -larchive -lpthread
+LIBS = -larchive -lpthread `sdl-config --libs`
 # Executable extension
 EXE = .exe
 # Output directory
@@ -25,7 +25,7 @@ BIN = bin/debug
 RM = rm -f
 
 # These macros speed up typing, you shouldn't need to change them
-OBJS = src/main.o src/debug.o src/resource.o
+OBJS = src/main.o src/debug.o src/resource.o src/geometry.o src/fixed.o
 
 # Make definitions follow
 # Default target
@@ -42,11 +42,15 @@ $(BIN)/bullet-rain$(EXE): $(OBJS)
 #   when header files change
 
 # c files
-src/main.c: src/compile.h src/debug.h src/fixed.h src/resource.h
+src/main.c: src/compile.h src/debug.h src/fixed.h src/resource.h src/geometry.h
 
 src/debug.c: src/compile.h src/debug.h
 
+src/fixed.c: src/fixed.h
+
 src/resource.c: src/compile.h src/debug.h src/resource.h
+
+src/geometry.c: src/geometry.h src/fixed.h
 
 # header files
 src/debug.h: src/compile.h
@@ -54,6 +58,8 @@ src/debug.h: src/compile.h
 src/fixed.h: src/debug.h
 
 src/resource.h: src/compile.h
+
+src/geometry.h: src/fixed.h
 # compile.h doesn't depend on anything
 
 # Clean target

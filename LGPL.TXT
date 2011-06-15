@@ -1,3 +1,12 @@
+---------------------------------------------------------------------
+NOTE: bullet rain is NOT released under the GNU LGPL. It is released
+under the MIT License. See LICENSE.TXT for more information.
+
+The Simple Directmedia Layer (SDL) library is released under the GNU
+LGPL. That license is reproduced here for your convenience.
+---------------------------------------------------------------------
+
+
           GNU LESSER GENERAL PUBLIC LICENSE
                Version 2.1, February 1999
 

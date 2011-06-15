@@ -21,23 +21,27 @@
 
 #include "debug.h"
 #include "fixed.h"
+#include "geometry.h"
 #include "resource.h"
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 void fixed_test(void);
+void geom_test(void);
 void hash_test(void);
 void res_test(void);
 
-#define MAIN_MENU_SIZE 7
+#define MAIN_MENU_SIZE 8
 const char menu[MAIN_MENU_SIZE][32] = {
     "Main menu:",
     " 1. Fixed-point arithmetic test",
-    " 2. String hashing test",
-    " 3. Resource loading test",
+    " 2. Geometry test",
+    " 3. String hashing test",
+    " 4. Resource loading test",
     " q. Quit",
     "",
     "Your choice:"
@@ -72,9 +76,12 @@ int main(int nargs, char *args[])
                 fixed_test();
                 break;
             case '2':
-                hash_test();
+                geom_test();
                 break;
             case '3':
+                hash_test();
+                break;
+            case '4':
                 res_test();
                 break;
             case 'q':
@@ -120,6 +127,59 @@ void fixed_test(void)
         print_fixed(fixdiv(a,b));
         puts("");
     }
+}
+
+#define DIAMETER 760
+#define WIDTH 800
+void geom_test(void)
+{
+    char img[WIDTH][WIDTH];
+    int i,j,x,y;
+    double mx, my, dangle;
+    angle_t currang;
+    polar_point p;
+    rect_point r;
+    FILE *out;
+    
+    const int center = WIDTH/2;
+    const fixed_t radius = tofixed(DIAMETER/2,0);
+    const double dradius = intpart(radius) + (fracpart(radius)/65536.0);
+    const angle_t step = makeangle(0,4096); /* so 4096 steps */
+    
+    puts("Drawing a big circle and outputting it to geometry.txt");
+    
+    debug("Filling memory buffer with spaces");
+    for (i = 0; i < WIDTH; ++i) {
+        for (j = 0; j < WIDTH; ++j) {
+            img[i][j] = ' ';
+        }
+    }
+    
+    debug("Beginning to draw circle");
+    p.r = radius;
+    for (currang = zeroangle; currang < maxangle; currang += step) {
+        p.t = currang;
+        r = polar_to_rect(p);
+        x = intpart(r.x + tofixed(center,0));
+        y = intpart(r.y + tofixed(center,0));
+        img[y][x] = '#';
+        
+        dangle = intpart(currang) + (fracpart(currang)/65536.0);
+        mx = dradius * cos(dangle);
+        my = dradius * sin(dangle);
+        x = (int)(mx + center);
+        y = (int)(my + center);
+        img[y][x] = 'C';
+    }
+    
+    out = fopen("geometry.txt", "w");
+    for (i = 0; i < WIDTH; i++) {
+        for (j = 0; j < WIDTH; j++) {
+            fputc(img[i][j], out);
+        }
+        fputc('\n', out);
+    }
+    fclose(out);
 }
 
 void hash_test(void)

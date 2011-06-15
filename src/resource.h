@@ -52,6 +52,8 @@ typedef uint32_t sid_t;
 typedef enum {
     RES_IMAGE,   /* image intended to be used as a GUI graphic - PNG */
     RES_TEXTURE, /*     image intended to be used in-game      - BIN */
+    RES_MIDI,    /*               MIDI music file              - MID */
+    RES_SOUND,   /*       Ogg Vorbis sound or music file       - OGG */
     RES_SCRIPT,  /*                 Lua script                 - LUA */
     RES_STRING,  /*         some kind of string resource       - TXT */
     RES_MAP,     /*               level tile data              - MAP */
@@ -64,6 +66,8 @@ typedef enum {
  */
 #define PNG_HASH 0x5c4046f0
 #define BIN_HASH 0x090e5a36
+#define MID_HASH 0xefe92d02
+#define OGG_HASH 0x3cb30fc1
 #define LUA_HASH 0xf4af8b0f
 #define TXT_HASH 0x1c6ca03e
 #define MAP_HASH 0x0dc0b9a8
