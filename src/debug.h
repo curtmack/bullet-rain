@@ -97,6 +97,12 @@ extern void _warnn (char *msg1, int num, char *file, int line);
                          else { \
                            _panicn(msg1, num, __FILE__, __LINE__); \
                          }
+
+/* Macro to check to the return value of SDL_mutexX */
+#define check_mutex(result) \
+                    if (result == -1) { \
+                        _panic("Mutex lock failure", "", __FILE__, __LINE__); \
+                    }
                          
 extern void _panic (char *msg1, char *msg2, char *file, int line);
 extern void _panicn (char *msg1, int num, char *file, int line);

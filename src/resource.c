@@ -16,10 +16,16 @@
 #include "compile.h"
 #include "debug.h"
 #include "resource.h"
+#ifdef INCLUDE_SDL_PREFIX
+#include "SDL/SDL.h"
+#include "SDL/SDL_thread.h"
+#else
+#include "SDL.h"
+#include "SDL_thread.h"
+#endif
 #include <archive.h>
 #include <archive_entry.h>
 #include <ctype.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -90,21 +96,50 @@ sid_t calculate_sid(char *string)
 /* arclist chain */
 arclist *arc_head = NULL;
 arclist *arc_tail = NULL;
-pthread_mutex_t arc_lock = PTHREAD_MUTEX_INITIALIZER;
+SDL_mutex *arc_lock;
 
 /* For creating human-readable description of what I'm doing */
-pthread_mutex_t load_lock = PTHREAD_MUTEX_INITIALIZER;
+SDL_mutex *load_lock;
+int progress;
 char doing[40];
+
+/* Return the human-readable description of what I'm doing */
+int get_progress(char *buf, size_t n)
+{
+    int r;
+    
+    r = SDL_mutexP(load_lock);
+    check_mutex(r);
+    strncpy(buf, doing, n);
+    return progress;
+    r = SDL_mutexV(load_lock);
+    check_mutex(r);
+}
+
+/* Reset the progress spinner */
+void reset_progress(void)
+{
+    int r;
+    
+    r = SDL_mutexP(load_lock);
+    check_mutex(r);
+    progress = 0;
+    r = SDL_mutexV(load_lock);
+    check_mutex(r);
+}
 
 /* Get an archive from the arclist chain */
 inline arclist *_get_arc_from_chain(sid_t id)
 {
     arclist *temparc;
+    int r;
     
-    pthread_mutex_lock(&arc_lock);
+    r = SDL_mutexP(arc_lock);
+    check_mutex(r);
     for(temparc = arc_head; temparc != NULL && temparc->id != id;
         temparc = temparc->next);
-    pthread_mutex_unlock(&arc_lock);
+    r = SDL_mutexV(arc_lock);
+    check_mutex(r);
     return temparc;
 }
 
@@ -123,35 +158,41 @@ arclist *load_arc(char *arcname)
     
     debug2("Starting to load archive", arcname);
     
-    pthread_mutex_lock(&load_lock);
-    
     temphash = calculate_sid(arcname);
     /* Do we already have this arclist in memory? */
     if ((newarclist = _get_arc_from_chain(temphash))) {
         debug("Archive found in arc chain");
         /* And is it loaded? */
-        pthread_mutex_lock(&(newarclist->_lock));
+        r = SDL_mutexP(newarclist->_lock);
+        check_mutex(r);
         if(newarclist->loaded) {
-            debug("Archive is loaded, we're done.");
             /* Then we're golden */
-            pthread_mutex_unlock(&(newarclist->_lock));
+            debug("Archive is loaded, we're done.");
+            r = SDL_mutexV(newarclist->_lock);
+            check_mutex(r);
             return newarclist;
         }
-        /* still don't need to make a new one at least */
+        /* if not, we sill don't need to make a new one at least */
     }
     else {
         /* Make an arclist */
+        r = SDL_mutexP(load_lock);
+        check_mutex(r);
         sprintf(doing, "Initializing archive %s", arcname);
+        ++progress;
         debug(doing);
+        r = SDL_mutexV(load_lock);
+        check_mutex(r);
         
         newarclist = malloc(sizeof(arclist));
         panic2(newarclist, "Could not allocate memory for new arclist:", arcname);
         
         /* Prepare the lock */
-        newarclist->_lock = PTHREAD_MUTEX_INITIALIZER;
+        newarclist->_lock = SDL_CreateMutex();
                                         
         /* Lock it */
-        pthread_mutex_lock(&(newarclist->_lock));
+        r = SDL_mutexP(newarclist->_lock);
+        check_mutex(r);
         
         /* Prepare other stuff */
         strcpy(newarclist->name, arcname);
@@ -163,7 +204,8 @@ arclist *load_arc(char *arcname)
         }
         
         /* Add it to the arclist chain */
-        pthread_mutex_lock(&arc_lock);
+        r = SDL_mutexP(arc_lock);
+        check_mutex(r);
         if (arc_head) {
             /* 
              * List is not currently empty - add it
@@ -178,11 +220,19 @@ arclist *load_arc(char *arcname)
             arc_head = newarclist;
             arc_tail = newarclist;
         }
-        pthread_mutex_unlock(&arc_lock);
+        r = SDL_mutexV(arc_lock);
+        check_mutex(r);
     }
+    
     /* Start loading the archive */
+    r = SDL_mutexP(load_lock);
+    check_mutex(r);
     sprintf(doing, "Opening up archive %s", arcname);
+    ++progress;
     debug(doing);
+    r = SDL_mutexV(load_lock);
+    check_mutex(r);
+    
     newarc = archive_read_new();
     /* All archives are gzipped tarballs */
     
@@ -210,18 +260,24 @@ arclist *load_arc(char *arcname)
     while (archive_read_next_header(newarc, &entry) == ARCHIVE_OK) {
         tempname = (char*) archive_entry_pathname(entry);
         
+        r = SDL_mutexP(load_lock);
+        check_mutex(r);
         sprintf(doing, "Reading in archive entry %s", tempname);
+        ++progress;
         debug(doing);
+        r = SDL_mutexV(load_lock);
+        check_mutex(r);
         
         /* Set up new resource entry */
         newresource = malloc(sizeof(resource));
         panic2(newresource, "Couldn't allocate memory for new resource",
                                                                     tempname);
                                                                     
-        newresource->_lock = PTHREAD_MUTEX_INITIALIZER;
+        newresource->_lock = SDL_CreateMutex();
         
         /* Lock it */
-        pthread_mutex_lock(&(newresource->_lock));
+        r = SDL_mutexP(newresource->_lock);
+        check_mutex(r);
         
         /* 
          * Copy over some stuff
@@ -279,6 +335,14 @@ arclist *load_arc(char *arcname)
                 newresource->type = RES_OTHER;
         }
         
+        r = SDL_mutexP(load_lock);
+        check_mutex(r);
+        sprintf(doing, "Mapping resource %s", newresource->name);
+        ++progress;
+        debug(doing);
+        r = SDL_mutexV(load_lock);
+        check_mutex(r);
+        
         /* Store it in arclist */
         tempres = newarclist->map[reshash%ARCLIST_HASH_SIZE];
         if (tempres) {
@@ -296,6 +360,15 @@ arclist *load_arc(char *arcname)
         }
         
         /* Now we need to load this entry, pretty standard stuff */
+        
+        r = SDL_mutexP(load_lock);
+        check_mutex(r);
+        sprintf(doing, "Loading resource %s into memory", newresource->name);
+        ++progress;
+        debug(doing);
+        r = SDL_mutexV(load_lock);
+        check_mutex(r);
+        
         tempdat = malloc((size_t)newresource->size);
         panic2(tempdat, "Couldn't allocate memory to load resource",
                 newresource->name);
@@ -304,11 +377,18 @@ arclist *load_arc(char *arcname)
         newresource->data = tempdat;
         
         /* Finally, unlock */
-        pthread_mutex_unlock(&(newresource->_lock));
+        r = SDL_mutexV(newresource->_lock);
+        check_mutex(r);
     }
     /* Everything's loaded, just need to clean some stuff */
+    
+    r = SDL_mutexP(load_lock);
+    check_mutex(r);
     sprintf(doing, "Cleaning up internal copy of %s", arcname);
+    ++progress;
     debug(doing);
+    r = SDL_mutexV(load_lock);
+    check_mutex(r);
     
     /* 
      * "libarchive version 3 is just around the corner! Honest!"
@@ -321,27 +401,32 @@ arclist *load_arc(char *arcname)
 #endif
 
     newarclist->loaded = 1;
-    pthread_mutex_unlock(&(newarclist->_lock));
+    r = SDL_mutexV(newarclist->_lock);
+    check_mutex(r);
     
     /* clear this out */
+    r = SDL_mutexP(load_lock);
+    check_mutex(r);
     doing[0] = '\0';
     debug2("Done loading archive", arcname);
-    pthread_mutex_unlock(&load_lock);
+    r = SDL_mutexV(load_lock);
+    check_mutex(r);
     return newarclist;
 }
 
 /* Internal function to free an archive */
 void _free_arc(arclist *arc)
 {
-    int i;
     resource *tempres, *nextres;
+    int i, r;
     
     /* Is it freed already? */
     if (!(arc->loaded)) {
     }
     else {
         /* Lock it */
-        pthread_mutex_lock(&(arc->_lock));
+        r = SDL_mutexP(arc->_lock);
+        check_mutex(r);
         
         /* Free all resources */
         debug2("Freeing resources in arclist", arc->name);
@@ -351,6 +436,7 @@ void _free_arc(arclist *arc)
                 /* Free everything */
                 debug2("Freeing resource", tempres->name);
                 free(tempres->data);
+                SDL_DestroyMutex(tempres->_lock);
                 
                 /* Free the resource itself, need to shuffle around a bit */
                 nextres = tempres->next;
@@ -362,7 +448,8 @@ void _free_arc(arclist *arc)
     
         /* Clean up */
         arc->loaded = 0;
-        pthread_mutex_unlock(&(arc->_lock));
+        r = SDL_mutexV(arc->_lock);
+        check_mutex(r);
         
         debug2("Done freeing archive", arc->name);
     }
@@ -383,13 +470,16 @@ arclist *get_arc(char *arcname)
 {
     arclist *temp;
     sid_t archash;
+    int r;
     
     archash = calculate_sid(arcname);
     temp = _get_arc_from_chain(archash);
     if (temp) {
         /* If it's being worked on, wait */
-        pthread_mutex_lock(&(temp->_lock));
-        pthread_mutex_unlock(&(temp->_lock));
+        r = SDL_mutexV(temp->_lock);
+        check_mutex(r);
+        r = SDL_mutexP(temp->_lock);
+        check_mutex(r);
         return temp;
     }
     else {
@@ -404,6 +494,7 @@ resource *get_res(char *arcname, char *resname)
     arclist *temparc;
     resource *tempres;
     sid_t reshash;
+    int r;
     
     temparc = get_arc(arcname); 
     /* Was the arclist freed? */
@@ -416,15 +507,19 @@ resource *get_res(char *arcname, char *resname)
     
     reshash = calculate_sid(resname);
     /* Look for the resource we want */
-    pthread_mutex_lock(&(temparc->_lock));
+    r = SDL_mutexP(temparc->_lock);
+    check_mutex(r);
     for (tempres = temparc->map[reshash%ARCLIST_HASH_SIZE];
          tempres != NULL && tempres->id != reshash; tempres = tempres->next);
-    pthread_mutex_unlock(&(temparc->_lock));
+    r = SDL_mutexV(temparc->_lock);
+    check_mutex(r);
     
     if (tempres) {
         /* If it's being worked on, wait */
-        pthread_mutex_lock(&(tempres->_lock));
-        pthread_mutex_unlock(&(tempres->_lock));
+        r = SDL_mutexP(tempres->_lock);
+        check_mutex(r);
+        r = SDL_mutexV(tempres->_lock);
+        check_mutex(r);
     }
     warn2(tempres,
             "Arclist was loaded but it didn't have the requested resource:",
@@ -435,18 +530,15 @@ resource *get_res(char *arcname, char *resname)
 /* Initialize stuff needed by all resource functions */
 void init_resources(void)
 {
-    /*
-     * ... We don't actually do anything here
-     * This is just here for legacy, and because having stop_ without init_
-     * feels weird
-     */
-    
+    arc_lock = SDL_CreateMutex();
+    load_lock = SDL_CreateMutex();
     debug("Resource loader initialized");
 }
 
 void stop_resources(void)
 {
     arclist *temparc, *nextarc;
+    int r;
     
     /*
      * Clear EVERYTHING
@@ -456,7 +548,8 @@ void stop_resources(void)
      * Just to be safe, though, we'll still lock/unlock the arclist chain
      */
     
-    pthread_mutex_lock(&arc_lock);
+    r = SDL_mutexP(arc_lock);
+    check_mutex(r);
     temparc = arc_head;
     while (temparc) {
         debug2("Clearing arclist", temparc->name);
@@ -469,13 +562,19 @@ void stop_resources(void)
         
         /* Now go to work on its guts */
         debug2("Freeing arclist memory:", temparc->name);
+        SDL_DestroyMutex(temparc->_lock);
         nextarc = temparc->next;
         free(temparc);
         temparc = nextarc;
         
         debug("Arclist freed (can't display name, it's gone)");
     }
-    pthread_mutex_unlock(&arc_lock);
+    r = SDL_mutexV(arc_lock);
+    check_mutex(r);
+    
+    debug("Freeing miscellaneous memory");
+    SDL_DestroyMutex(arc_lock);
+    SDL_DestroyMutex(load_lock);
     
     debug("Resources stopped and ready for engine closure.");
 }

@@ -17,7 +17,13 @@
 #define RESOURCE_H
 
 #include "compile.h"
-#include <pthread.h>
+#ifdef INCLUDE_SDL_PREFIX
+#include "SDL/SDL.h"
+#include "SDL/SDL_thread.h"
+#else
+#include "SDL.h"
+#include "SDL_thread.h"
+#endif
 #include <stdint.h>
 
 /*
@@ -74,14 +80,15 @@ typedef enum {
 
 typedef struct resource resource;
 struct resource {
+    int64_t   size; /* yeah that's the form libarchive gives it to us in */
+    
     resource *next;
     char      name[16];
     sid_t     id;
     restype   type;
     void     *data;
-    int64_t   size; /* yeah that's the form libarchive gives it to us in */
     
-    pthread_mutex_t _lock;
+    SDL_mutex *_lock;
 };
 
 typedef struct arclist arclist;
@@ -92,7 +99,7 @@ struct arclist {
     int       loaded;
     resource *map[ARCLIST_HASH_SIZE];
     
-    pthread_mutex_t _lock;
+    SDL_mutex *_lock;
 };
 
 extern void clip_string(char *a);
@@ -104,7 +111,7 @@ extern void init_resources(void);
 extern void stop_resources(void);
 
 /* Get progress information for loading screen */
-extern void get_progress(char *doing);
+extern int get_progress(char *buf, size_t n);
 
 /*
  * load_arc loads an archive,  The get_ functions block
