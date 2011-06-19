@@ -35,7 +35,7 @@
 /* Compile system tests rather than the usual main() */
 #define SYSTEM_TEST
 
-/* Include "SDL/SDL_***.h" instead of "SDL_***.h" */
+/* Include "SDL/SDL_***.h" instead of "SDL_***.h", needed on e.g. Ubuntu */
 #define INCLUDE_SDL_PREFIX
 
 /* Version string */

@@ -17,6 +17,8 @@
 #define RESOURCE_H
 
 #include "compile.h"
+#include <stdint.h>
+
 #ifdef INCLUDE_SDL_PREFIX
 #include "SDL/SDL.h"
 #include "SDL/SDL_thread.h"
@@ -24,7 +26,6 @@
 #include "SDL.h"
 #include "SDL_thread.h"
 #endif
-#include <stdint.h>
 
 /*
  * Here, we're using a hash map to store the different resources

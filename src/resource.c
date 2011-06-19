@@ -16,13 +16,6 @@
 #include "compile.h"
 #include "debug.h"
 #include "resource.h"
-#ifdef INCLUDE_SDL_PREFIX
-#include "SDL/SDL.h"
-#include "SDL/SDL_thread.h"
-#else
-#include "SDL.h"
-#include "SDL_thread.h"
-#endif
 #include <archive.h>
 #include <archive_entry.h>
 #include <ctype.h>
@@ -30,6 +23,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef INCLUDE_SDL_PREFIX
+#include "SDL/SDL.h"
+#include "SDL/SDL_thread.h"
+#else
+#include "SDL.h"
+#include "SDL_thread.h"
+#endif
 
 /*
  * Clips any non-printing characters off the end of a string
