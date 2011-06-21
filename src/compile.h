@@ -28,6 +28,8 @@
 
 /* Include debug bindings */
 #define DEBUG
+/* Verbose output */
+/* #define VERBOSE_DEBUG */
 
 /* Size of hash map used to store resources */
 #define ARCLIST_HASH_SIZE 1024

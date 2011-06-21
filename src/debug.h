@@ -39,6 +39,20 @@
 #define debugn(msg1,num) _debugn(msg1, num)
 
 /*
+ * verbose
+ * Produce output to stdout only if DEBUG and VERBOSE_DEBUG are defined
+ */
+#ifdef VERBOSE_DEBUG
+#define verbose(msg1) _debug(msg1, "")
+#define verbose2(msg1,msg2) _debug(msg1, msg2)
+#define verbosen(msg1,num) _debugn(msg1, num)
+#else
+#define verbose(msg1)
+#define verbose2(msg1,msg2)
+#define verbosen(msg1,num)
+#endif
+
+/*
  * warn
  * If cond is false, output a message to stderr, but resume.
  */

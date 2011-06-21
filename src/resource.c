@@ -62,8 +62,8 @@ char *get_ext(char *a)
         }
     }
     
-    debug("get_ext result:");
-    debug2(a, ext);
+    verbose("get_ext result:");
+    verbose2(a, ext);
     return ext;
 }
 
@@ -295,10 +295,12 @@ arclist *load_arc(char *arcname)
         newresource->size = archive_entry_size(entry);
         newresource->data = NULL;
         
+        /* Good to know! */
         debug2("Copied over filepath:", newresource->name);
-        debugn("File is size", newresource->size);
-        debugn("File has SID", (int)newresource->id);
-        debugn("File will be stored in map slot", reshash%ARCLIST_HASH_SIZE);
+        /* Less good to know */
+        verbosen("File is size", newresource->size);
+        verbosen("File has SID", (int)newresource->id);
+        verbosen("File will be stored in map slot", reshash%ARCLIST_HASH_SIZE);
         
         /* Try and determine filetype */
         temphash = calculate_sid(get_ext(newresource->name));
