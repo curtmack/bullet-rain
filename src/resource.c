@@ -102,7 +102,7 @@ SDL_mutex *arc_lock;
 /* For creating human-readable description of what I'm doing */
 SDL_mutex *load_lock;
 int progress;
-char doing[40];
+char doing[64];
 
 /* Return the human-readable description of what I'm doing */
 int get_progress(char *buf, size_t n)
