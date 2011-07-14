@@ -15,54 +15,42 @@ LINK = gcc
 # LINK flags
 LFLAGS = -Wall `sdl-config --cflags`
 # Library switches
-LIBS = -larchive -lpthread `sdl-config --libs`
+LIBS = -larchive -lpthread `sdl-config --libs` -lSDL_ttf -lSDL_image
 # Executable extension
 EXE = .exe
-# Output directory
-BIN = bin/debug
 # File deleting program, preferably one that ignores missing files
 #   (via commandline switch if necessary)
 RM = rm -f
 
 # These macros speed up typing, you shouldn't need to change them
-OBJS = src/main.o src/debug.o src/resource.o src/geometry.o src/fixed.o
+OBJS = src/main.o src/debug.o src/resource.o src/geometry.o src/fixed.o \
+       src/endian.o src/menu.o src/init.o
+# Debugging objects, you'll see why we need these separately
+DOBJS = src/main.do src/debug.do src/resource.do src/geometry.do src/fixed.do \
+		src/endian.do src/menu.do src/init.do
 
 # Make definitions follow
 # Default target
 
-$(BIN)/bullet-rain$(EXE): $(OBJS)
-	$(LINK) $(LFLAGS) $(OBJS) $(LIBS) -o $(BIN)/bullet-rain$(EXE)
+debug: bullet-rain-debug$(EXE)
+
+# Currently have nothing to do here
+# release: bullet-rain$(EXE)
+
+bullet-rain-debug$(EXE): $(DOBJS)
+	$(LINK) $(LFLAGS) $(DOBJS) $(LIBS) -d -o bullet-rain-debug$(EXE)
 
 # Object files
-
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
-	
-# Source files - used to detect which files need to be updated
-#   when header files change
 
-# c files
-src/main.c: src/compile.h src/debug.h src/fixed.h src/resource.h src/geometry.h
-
-src/debug.c: src/compile.h src/debug.h
-
-src/fixed.c: src/fixed.h
-
-src/resource.c: src/compile.h src/debug.h src/resource.h
-
-src/geometry.c: src/geometry.h src/fixed.h
-
-# header files
-src/debug.h: src/compile.h
-
-src/fixed.h: src/debug.h
-
-src/resource.h: src/compile.h
-
-src/geometry.h: src/fixed.h
-# compile.h doesn't depend on anything
+# Here we do some naught tricks to get object files with debugging flags
+%.do: %.c
+	$(CC) $(CFLAGS) -g -c $< -o $@
 
 # Clean target
 clean:
 	- $(RM) $(OBJS)
-	- $(RM) $(BIN)/bullet-rain$(EXE)
+	- $(RM) $(DOBJS)
+	- $(RM) bullet-rain-debug$(EXE)
+#	- $(RM) bullet-rain$(EXE)

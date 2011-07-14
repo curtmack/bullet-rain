@@ -49,7 +49,7 @@
  * resources, all of its resource entries, and its arclist structure.
  */
 
-typedef uint32_t sid_t;
+typedef Uint32 sid_t;
 
 /*
  * Enum for telling us what resource type we're looking at
@@ -58,7 +58,7 @@ typedef uint32_t sid_t;
  */
 typedef enum {
     RES_IMAGE,   /* image intended to be used as a GUI graphic - PNG */
-    RES_TEXTURE, /*     image intended to be used in-game      - BIN */
+    RES_BINARY,  /*    binary data - is this needed? No idea   - BIN */
     RES_MIDI,    /*               MIDI music file              - MID */
     RES_SOUND,   /*       Ogg Vorbis sound or music file       - OGG */
     RES_SCRIPT,  /*                 Lua script                 - LUA */
@@ -81,7 +81,7 @@ typedef enum {
 
 typedef struct resource resource;
 struct resource {
-    int64_t   size; /* yeah that's the form libarchive gives it to us in */
+    Sint64   size; /* yeah that's the form libarchive gives it to us in */
     
     resource *next;
     char      name[16];

@@ -20,16 +20,17 @@
 #include <archive_entry.h>
 #include <ctype.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef INCLUDE_SDL_PREFIX
 #include "SDL/SDL.h"
 #include "SDL/SDL_thread.h"
+#include "SDL/SDL_image.h"
 #else
 #include "SDL.h"
 #include "SDL_thread.h"
+#include "SDL_image.h"
 #endif
 
 /*
@@ -74,7 +75,7 @@ char *get_ext(char *a)
  */
 sid_t calculate_sid(char *string)
 {
-    uint32_t hash, i;
+    Uint32 hash, i;
 
     /*
      * We assume here string is properly null-terminated,
@@ -127,6 +128,35 @@ void reset_progress(void)
     progress = 0;
     r = SDL_mutexV(load_lock);
     check_mutex(r);
+}
+
+/* 
+ * "Doctor" a resource to its finished format
+ * Mainly, this converts PNGs to SDL_Surfaces
+ */
+void _doctor_resource(resource *res)
+{
+    SDL_Surface *img;
+    SDL_RWops   *rwop;
+    
+    /* We assume the calling function has already locked the resource */
+    switch (res->type) {
+        case RES_IMAGE:
+            /*  Need to go through SDL_RWops to load an image from memory */
+            debug2("Doctoring image:", res->name);
+            verbose("Creating SDL_RWops");
+            rwop = SDL_RWFromMem(res->data, res->size);
+            panic(rwop != NULL, "Failed to set up SDL_RWops");
+            verbose("Loading PNG from SDL_RWops");
+            img  = IMG_LoadPNG_RW(rwop);
+            verbose("Cleaning up");
+            SDL_FreeRW(rwop);
+            free(res->data);
+            res->data = (void*)img;
+            break;
+        default:
+            break;
+    }
 }
 
 /* Get an archive from the arclist chain */
@@ -311,7 +341,7 @@ arclist *load_arc(char *arcname)
                 break;
             case BIN_HASH:
                 debug("Filetype is BIN");
-                newresource->type = RES_TEXTURE;
+                newresource->type = RES_BINARY;
                 break;
             case MID_HASH:
                 debug("Filetype is MID");
@@ -379,6 +409,9 @@ arclist *load_arc(char *arcname)
         
         newresource->data = tempdat;
         
+        /* Convert from file format to internal format, if needed */
+        _doctor_resource(newresource);
+        
         /* Finally, unlock */
         r = SDL_mutexV(newresource->_lock);
         check_mutex(r);
@@ -438,7 +471,15 @@ void _free_arc(arclist *arc)
             while (tempres) {
                 /* Free everything */
                 debug2("Freeing resource", tempres->name);
-                free(tempres->data);
+                /* Wait, how DO we free it? */
+                switch (tempres->type) {
+                    case RES_IMAGE:
+                        SDL_FreeSurface((SDL_Surface*)tempres->data);
+                        break;
+                    default:
+                        free(tempres->data);
+                        break;
+                }
                 SDL_DestroyMutex(tempres->_lock);
                 
                 /* Free the resource itself, need to shuffle around a bit */

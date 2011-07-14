@@ -41,6 +41,20 @@
 #define INCLUDE_SDL_PREFIX
 
 /* Version string */
-#define ENGINE_VERSION "0.0.0.1"
+#define ENGINE_VERSION "0.0.0.2"
+/* padded with nulls to 16 chars */
+#define ENGINE_VERSION_16 "0.0.0.2\0\0\0\0\0\0\0\0\0"
+
+/* 
+ * Some compilers don't provide these for some reason?
+ * Also if you're using some alien version of C I suppose you could change
+ * these to whatever your bizarre extraterrestrial compiler needs
+ * Change the #if 1 to a 0 if you don't need these
+ * (you'll probably get a warning saying you shouldn't do that)
+ */
+#if 1
+#define TRUE  1
+#define FALSE 0
+#endif
 
 #endif /* !def COMPILE_H */

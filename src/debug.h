@@ -40,7 +40,7 @@
 
 /*
  * verbose
- * Produce output to stdout only if DEBUG and VERBOSE_DEBUG are defined
+ * Produce output to stdout only if DEBUG and VERBOSE_DEBUG are both defined
  */
 #ifdef VERBOSE_DEBUG
 #define verbose(msg1) _debug(msg1, "")
@@ -87,6 +87,9 @@ extern void _warnn (char *msg1, int num, char *file, int line);
 #define warn(cond,msg1)
 #define warn2(cond,msg1,msg2)
 #define warnn(cond,msg1,num)
+#define verbose(msg1)
+#define verbose2(msg1,msg2)
+#define verbosen(msg1,num)
 
 #endif /* def DEBUG */
 
