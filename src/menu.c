@@ -68,16 +68,18 @@ int start_menu(brmenu *brm)
     /* Make the thread */
     brm->thread = SDL_CreateThread(&_menu_runner, brm);
    
-    r = SDL_mutexV(brm->_lock);
-    check_mutex(r);
     
     /* Did it work? */
     if (brm->thread != NULL) {
         brm->running = TRUE;
+        r = SDL_mutexV(brm->_lock);
+        check_mutex(r);
         return 0;
     }
     else {
         brm->running = FALSE;
+        r = SDL_mutexV(brm->_lock);
+        check_mutex(r);
         return 1;
     }
 }
@@ -263,11 +265,11 @@ void draw_menu(brmenu *brm)
 int wait_on_menu(brmenu *brm)
 {
     if (brm->thread == NULL || !(brm->running)) {
-        return 0;
+        return 1;
     }
     
     SDL_WaitThread(brm->thread, NULL);
-    return 1;
+    return 0;
 }
 
 void destroy_menu(brmenu *brm)
