@@ -106,15 +106,24 @@ struct brmenu_entry_ {
      * Note that these aren't necessary for basic functionality.
      * Arguments are always the menu pointer and this entry's pointer
      */
-    void (*on_selected)  (brmenu*, brmenu_entry*);
-    void (*on_deselected)(brmenu*, brmenu_entry*);
-    /* if this returns false, menu doesn't stop */
-    int  (*on_enter)     (brmenu*, brmenu_entry*);
     
+    /* Called when the entry is selected */
+    void (*on_selected)  (brmenu*, brmenu_entry*);
+
+    /* Called when the entry is deselected */
+    void (*on_deselected)(brmenu*, brmenu_entry*);
+
     /* 
-     * These return a pointer to the new entry to select
-     * Note: These are only used if the pointer in that direction is NULL
-     */
+    * Called if the confirm button is pressed while the entry is selected
+    * If it returns FALSE, the menu doesn't stop like it normally does
+    */
+    int  (*on_enter)     (brmenu*, brmenu_entry*);
+
+    /* 
+    * Called when the cursor wants to move in the given direction, and
+    * a normal pointer for that direction doesn't exist.
+    * These all return a pointer to the new entry to select
+    */
     brmenu_entry *(*on_up)    (brmenu*, brmenu_entry*);
     brmenu_entry *(*on_down)  (brmenu*, brmenu_entry*);
     brmenu_entry *(*on_left)  (brmenu*, brmenu_entry*);

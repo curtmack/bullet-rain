@@ -189,8 +189,6 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     /* Link all the entries together */
     menu_link_entries(brm);
     
-    debugn("First entry's left pointer:", (int)brm->entries->left);
-    
     return brm;
 }
 
