@@ -2,13 +2,27 @@ REQUIRED LIBRARIES:
 
  - C standard library
  - libarchive
- x SDL
+ - SDL
+   x SDL_image
+   x SDL_mixer, which MUST be configured for OGG files
+   - SDL_ttf
  x Lua
 
 (x means "Not actually used or required yet, but will be some day")
 
 Note that you will need the development versions of these libraries to
 build the engine.
+
+ADDITIONALLY, if you are going to make a SYSTEM_TEST build (currently,
+the only kind of build), then you'll need to supply a font for the
+program to use. I couldn't find any monospaced fonts with licenses
+that permit me to distribute them with the source, so you're on your
+own. I recommend ProFont, which is free:
+
+http://www.tobias-jung.de/seekingprofont/
+
+Whatever font you use, rename it monofont.ttf and put it in the res
+directory.
 
 
 COMPILING:
@@ -38,10 +52,9 @@ beginning:
  - LFLAGS: Miscellaneous commandline flags given to LINK.
  - LIBS:   Commandline switches given to the compiler to import the
            necessary libraries. This should be fine as-is.
- - EXE:    Binary extension. For example, .exe on Windows, nothing on
-           UNIX. Include the dot.
- - BIN:    Directory to put it in. Usually "bin/debug" for debug builds,
-           "bin/release" for release builds.
+ - BIN:    The name of the output file. Include a .exe if your system
+           requires it. "bullet-hell-debug" is the standard base, but of
+           course you can use whatever you fancy.
  - RM:     A program that deletes files specified on its commandline.
            Used for "make clean." rm -f or del are the usual options.
 

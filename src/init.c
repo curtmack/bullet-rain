@@ -27,7 +27,6 @@
 
 int init_all(void)
 {
-    init_endian();
     init_resources();
     SDL_Init(SDL_INIT_EVERYTHING);
     IMG_Init(IMG_INIT_PNG);
@@ -42,7 +41,6 @@ int stop_all(void)
     IMG_Quit();
     SDL_Quit();
     stop_resources();
-    /* no stop_endian to worry about */
     
     return 0;
 }

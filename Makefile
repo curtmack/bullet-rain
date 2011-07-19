@@ -24,10 +24,10 @@ RM = rm -f
 
 # These macros speed up typing, you shouldn't need to change them
 OBJS = src/main.o src/debug.o src/resource.o src/geometry.o src/fixed.o \
-       src/endian.o src/menu.o src/init.o
+       src/menu.o src/init.o
 # Debugging objects, you'll see why we need these separately
 DOBJS = src/main.do src/debug.do src/resource.do src/geometry.do src/fixed.do \
-		src/endian.do src/menu.do src/init.do
+		src/menu.do src/init.do
 
 # Make definitions follow
 # Default target
