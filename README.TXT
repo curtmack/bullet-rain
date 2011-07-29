@@ -3,7 +3,7 @@ REQUIRED LIBRARIES:
  - C standard library
  - libarchive
  - SDL
-   x SDL_image
+   - SDL_image
    x SDL_mixer, which MUST be configured for OGG files
    - SDL_ttf
  x Lua
@@ -29,6 +29,14 @@ COMPILING:
 
 Since everything is still rather crude, you'll need to edit everything
 yourself like a caveman.
+
+If you're using Linux or MinGW, there are some defaults already set up.
+Rename or copy Makefile.______ to Makefile, and src/compile.h.______
+to src/compile.h, where ______ is the system in question. You may still
+need to fiddle with the settings, however.
+
+If you're not using either system, pick whichever one you think is the
+closest, and start with that.
 
 Open up src/compile.h and change the compilation settings to what you
 need for your platform. The comments should help you, but you're mostly

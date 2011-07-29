@@ -32,6 +32,15 @@
 typedef struct brmenu_ brmenu;
 typedef struct brmenu_entry_ brmenu_entry;
 
+typedef enum {
+    DO_NOTHING,
+    DO_UP,
+    DO_DOWN,
+    DO_LEFT,
+    DO_RIGHT,
+    DO_CONFIRM
+} brmenu_action;
+
 struct brmenu_ {
     /* 
      * Linked list of entries
@@ -62,6 +71,9 @@ struct brmenu_ {
 
     /* Where did we end? */
     Sint32 end;
+    
+    /* What do we do next? */
+    brmenu_action action;
 };
 
 struct brmenu_entry_ {
@@ -100,6 +112,9 @@ struct brmenu_entry_ {
     
     /* Is this selected? */
     Sint32 selected;
+    
+    /* Some additional data, can be used as needed */
+    Sint32 data[4];
     
     /*
      * Callbacks, if needed
@@ -149,5 +164,8 @@ extern void menu_link_entries(brmenu *brm);
 extern void draw_menu   (brmenu *brm);
 extern int  wait_on_menu(brmenu *brm);
 extern void destroy_menu(brmenu *brm);
+
+extern brmenu_action get_action (void);
+extern void          menu_action(brmenu *brm, brmenu_action act);
 
 #endif /* !def MENU_H */

@@ -308,25 +308,78 @@ void destroy_menu(brmenu *brm)
 }
 
 
-
-/* The beast, this is the actual menu thread function */
-
-int _menu_runner(void *data)
+/* Handle input and process it into a menu action */
+brmenu_action get_action(void)
 {
-    int r, justhat = FALSE;
-    brmenu *me;
-    brmenu_entry *temp;
+    int r;
+    brmenu_action todo;
     SDL_Event event;
     
-    /* Inline anonymous enum type, yum yum */
-    enum {
-        DO_NOTHING,
-        DO_UP,
-        DO_DOWN,
-        DO_LEFT,
-        DO_RIGHT,
-        DO_ENTER
-    } todo;
+    r = SDL_PollEvent(&event);
+    if (r != 0) {
+        /* We really only care about key and joystick events */
+        /* TODO: Tie this into the input system so it can be configured */
+        switch(event.type) {
+            case SDL_KEYDOWN:
+                switch(event.key.keysym.sym) {
+                    /* Check for up, down, left, right, enter */
+                    case SDLK_UP:
+                        todo = DO_UP;
+                        break;
+                    case SDLK_DOWN:
+                        todo = DO_DOWN;
+                        break;
+                    case SDLK_LEFT:
+                        todo = DO_LEFT;
+                        break;
+                    case SDLK_RIGHT:
+                        todo = DO_RIGHT;
+                        break;
+                    case SDLK_RETURN:
+                        todo = DO_CONFIRM;
+                        break;
+                    /* Need to clear todo otherwise */
+                    default:
+                        todo = DO_NOTHING;
+                        break;
+                }
+                break;
+            default:
+                todo = DO_NOTHING;
+                break;
+        }
+    }
+    else {
+        todo = DO_NOTHING;
+    }
+    
+    return todo;
+}
+
+
+/* Set the menu action in a menu */
+void menu_action(brmenu *brm, brmenu_action act)
+{
+    int r;
+    
+    r = SDL_mutexP(brm->_lock);
+    check_mutex(r);
+    
+    if (brm->action == DO_NOTHING) {
+        brm->action = act;
+    }
+    
+    r = SDL_mutexV(brm->_lock);
+    check_mutex(r);
+}
+
+
+/* The beast, this is the actual menu thread function */
+int _menu_runner(void *data)
+{
+    int r;
+    brmenu *me;
+    brmenu_entry *temp;
     
     me = (brmenu*) data;
     
@@ -348,276 +401,177 @@ int _menu_runner(void *data)
     r = SDL_mutexV(me->_lock);
     check_mutex(r);
     
+    debug("Menu started");
+    
     while (me->running) {
         /*
-         * Input processing
          * We leave it to the external thread to redraw ourselves
          * that way they can sync it to the main drawing cycle
+         * Furthermore, the main window thread has to handle input
+         * events on some systems, so we let an external thread handle
+         * that as well.
+         * So, let's just see if we have something to do and handle it.
          */
-        r = SDL_PollEvent(&event);
-        if (r != 0) {
-            /* We really only care about key and joystick events */
-            /* TODO: Tie this into the input system so it can be configured */
-            switch(event.type) {
-                case SDL_KEYDOWN:
-                    switch(event.key.keysym.sym) {
-                        /* Check for up, down, left, right, enter */
-                        case SDLK_UP:
-                            todo = DO_UP;
-                            break;
-                        case SDLK_DOWN:
-                            todo = DO_DOWN;
-                            break;
-                        case SDLK_LEFT:
-                            todo = DO_LEFT;
-                            break;
-                        case SDLK_RIGHT:
-                            todo = DO_RIGHT;
-                            break;
-                        case SDLK_RETURN:
-                            todo = DO_ENTER;
-                            break;
-                        /* Need to clear todo otherwise */
-                        default:
-                            todo = DO_NOTHING;
-                            break;
-                    }
-                    break;
-                case SDL_JOYHATMOTION:
-                    /* TODO: Make this check device and hat indices */
-                    switch(event.jhat.value) {
-                        /* 
-                         * Check POVhat position
-                         * Give priority to up or down in diagonals,
-                         * seems most menus are arranged vertically
-                         * The justhat variable means the hat has to be
-                         * centered before moving it will move the menu
-                         * cursor again.
-                         */
-                        case SDL_HAT_UP:
-                        case SDL_HAT_RIGHTUP:
-                        case SDL_HAT_LEFTUP:
-                            if (!justhat) {
-                                justhat = TRUE;
-                                todo = DO_UP;
-                            }
-                            else {
-                                todo = DO_NOTHING;
-                            }
-                            break;
-                        case SDL_HAT_DOWN:
-                        case SDL_HAT_RIGHTDOWN:
-                        case SDL_HAT_LEFTDOWN:
-                            if (!justhat) {
-                                justhat = TRUE;
-                                todo = DO_DOWN;
-                            }
-                            else {
-                                todo = DO_NOTHING;
-                            }
-                            break;
-                        case SDL_HAT_LEFT:
-                            if (!justhat) {
-                                justhat = TRUE;
-                                todo = DO_LEFT;
-                            }
-                            else {
-                                todo = DO_NOTHING;
-                            }
-                            break;
-                        case SDL_HAT_RIGHT:
-                            if (!justhat) {
-                                justhat = TRUE;
-                                todo = DO_RIGHT;
-                            }
-                            else {
-                                todo = DO_NOTHING;
-                            }
-                            break;
-                        default:
-                            /* Centered */
-                            justhat = FALSE;
-                            todo = DO_NOTHING;
-                            break;
-                    }
-                    break;
-                case SDL_JOYBUTTONDOWN:
-                    /* 
-                     * TODO: Make this check device index and
-                     * configurable button 
-                     */
-                    if (event.jbutton.button == 0 &&
-                        event.jbutton.state == SDL_PRESSED) {
-                        todo = DO_ENTER;
-                    }
-                    else {
-                        todo = DO_NOTHING;
-                    }
-                    break;
-                default:
-                    todo = DO_NOTHING;
-                    break;
-            }
+        r = SDL_mutexP(me->_lock);
+        check_mutex(r);
             
-            /* Now we actually perform the action, need to lock up first */
-            /* TODO: Need to play menu change sound */
-            r = SDL_mutexP(me->_lock);
-            check_mutex(r);
-            
-            switch (todo) {
-                case DO_NOTHING:
-                    /* we do nothing, obviously */
-                    break;
-                case DO_UP:
-                    if (me->selected->up != NULL) {
-                        temp = me->selected->up;
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    else if (me->selected->on_up != NULL) {
-                        temp = (*(me->selected->on_up))(me, me->selected);
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    break;
-                case DO_DOWN:
-                    if (me->selected->down != NULL) {
-                        temp = me->selected->down;
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    else if (me->selected->on_down != NULL) {
-                        temp = (*(me->selected->on_down))(me, me->selected);
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    break;
-                case DO_LEFT:
-                    if (me->selected->left != NULL) {
-                        temp = me->selected->left;
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    else if (me->selected->on_left != NULL) {
-                        temp = (*(me->selected->on_left))(me, me->selected);
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    break;
-                case DO_RIGHT:
-                    if (me->selected->right != NULL) {
-                        temp = me->selected->right;
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    else if (me->selected->on_right != NULL) {
-                        temp = (*(me->selected->on_right))(me, me->selected);
-                        me->selected->selected = FALSE;
-                        temp->selected = TRUE;
-                        
-                        /* check callbacks */
-                        if (me->selected->on_deselected != NULL) {
-                            (*(me->selected->on_deselected))(me, me->selected);
-                        }
-                        if (temp->on_selected != NULL) {
-                            (*(temp->on_selected))(me, temp);
-                        }
-                        
-                        me->selected = temp;
-                    }
-                    break;
-                case DO_ENTER:
-                    if (me->selected->on_enter != NULL) {
-                        r = (*(me->selected->on_enter))(me, me->selected);
-                    }
-                    else r = TRUE;
+        switch (me->action) {
+            case DO_NOTHING:
+                /* we do nothing, obviously */
+                break;                case DO_UP:
+                if (me->selected->up != NULL) {
+                    temp = me->selected->up;
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
                     
-                    if (r) {
-                        me->end = me->selected->id;
-                        /* In case this brmenu is used again */
-                        me->selected->selected = FALSE;
-                        me->running = FALSE;
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
                     }
-                    break;
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }                        
+                    me->selected = temp;                    
+                }
+                else if (me->selected->on_up != NULL) {
+                    temp = (*(me->selected->on_up))(me, me->selected);
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                    
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }                        
+                    me->selected = temp;
+                }
+                break;
+            
+            case DO_DOWN:
+                if (me->selected->down != NULL) {
+                    temp = me->selected->down;
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                    
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }
+                        
+                    me->selected = temp;
+                }
+                else if (me->selected->on_down != NULL) {
+                    temp = (*(me->selected->on_down))(me, me->selected);
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                        
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }
+                        
+                    me->selected = temp;
+                }
+                break;
+            
+            case DO_LEFT:
+                if (me->selected->left != NULL) {
+                    temp = me->selected->left;
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                    
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }
+                    
+                    me->selected = temp;
+                }
+                else if (me->selected->on_left != NULL) {
+                    temp = (*(me->selected->on_left))(me, me->selected);
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                    
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }
+                    
+                    me->selected = temp;
+                }
+                break;
+            
+            case DO_RIGHT:
+                if (me->selected->right != NULL) {
+                    temp = me->selected->right;
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                    
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }
+                    
+                    me->selected = temp;
+                }
+                else if (me->selected->on_right != NULL) {
+                    temp = (*(me->selected->on_right))(me, me->selected);
+                    me->selected->selected = FALSE;
+                    temp->selected = TRUE;
+                    
+                    /* check callbacks */
+                    if (me->selected->on_deselected != NULL) {
+                        (*(me->selected->on_deselected))(me, me->selected);
+                    }
+                    if (temp->on_selected != NULL) {
+                        (*(temp->on_selected))(me, temp);
+                    }
+                    
+                    me->selected = temp;
+                }
+                break;
+            
+            case DO_CONFIRM:
+                if (me->selected->on_enter != NULL) {
+                    r = (*(me->selected->on_enter))(me, me->selected);
+                }
+                else r = TRUE;
+                
+                if (r) {
+                    me->end = me->selected->id;
+                    /* In case this brmenu is used again */
+                    me->selected->selected = FALSE;
+                    me->running = FALSE;
+                }
+                break;
             }
             
-            /* Unlock */
-            r = SDL_mutexV(me->_lock);
-            check_mutex(r);
-            
-            /* Delay a little while to avoid sucking up all the CPU cycles */
-            SDL_Delay(10);
-        }
+        /* Reset */
+        me->action = DO_NOTHING;
+        
+        /* Unlock */
+        r = SDL_mutexV(me->_lock);
+        check_mutex(r);
+        
+        /* Delay a little while to avoid sucking up all the CPU cycles */
+        SDL_Delay(20);
     }
     return 1;
 }

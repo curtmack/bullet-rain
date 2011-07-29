@@ -29,22 +29,20 @@ void _debugn (char *msg1, int num) {
     fflush(stdout);
 }
 
+#endif /* def DEBUG */
+
+/* These we want in non-debug builds */
+
 void _warn (char *msg1, char *msg2, char *file, int line)
 {
-    fprintf(stderr, "  --> WARNING at %s line %d: %s %s\n",
-                                     file,  line,msg1,msg2);
-    fflush(stderr);
+    printf("  --> WARNING at %s line %d: %s %s\n", file, line, msg1, msg2);
+    fflush(stdout);
 }
 void _warnn (char *msg1, int num, char *file, int line)
 {
-    fprintf(stderr, "  --> WARNING at %s line %d: %s %d\n",
-                                     file,  line,msg1,num);
-    fflush(stderr);
+    printf("  --> WARNING at %s line %d: %s %d\n", file, line, msg1, num);
+    fflush(stdout);
 }
-
-#endif /* def DEBUG */
-
-/* This we want in non-debug builds */
 
 void _memdump(void)
 {
@@ -53,9 +51,9 @@ void _memdump(void)
 
 void _panic (char *msg1, char *msg2, char *file, int line)
 {
-    fprintf(stderr, "  --> PANIC at %s line %d: %s %s\n  Shutting down!\n",
-                                   file,  line,msg1,msg2);
-    fflush(stderr);
+    printf("  --> PANIC at %s line %d: %s %s\n  Shutting down!\n",
+                          file,  line,msg1,msg2);
+    fflush(stdout);
 
     _memdump();
     exit(1);
@@ -63,9 +61,9 @@ void _panic (char *msg1, char *msg2, char *file, int line)
 
 void _panicn (char *msg1, int num, char *file, int line)
 {
-    fprintf(stderr, "  --> PANIC at %s line %d: %s %d\n  Shutting down!\n",
-                                   file,  line,msg1,num);
-    fflush(stderr);
+    printf("  --> PANIC at %s line %d: %s %d\n  Shutting down!\n",
+                          file,  line,msg1,num);
+    fflush(stdout);
 
     _memdump();
     exit(1);

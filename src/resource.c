@@ -520,9 +520,9 @@ arclist *get_arc(char *arcname)
     temp = _get_arc_from_chain(archash);
     if (temp) {
         /* If it's being worked on, wait */
-        r = SDL_mutexV(temp->_lock);
-        check_mutex(r);
         r = SDL_mutexP(temp->_lock);
+        check_mutex(r);
+        r = SDL_mutexV(temp->_lock);
         check_mutex(r);
         return temp;
     }

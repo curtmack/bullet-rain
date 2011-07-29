@@ -11,7 +11,6 @@
  * Contains code for initializing and stopping all subsystems
  */
 
-#include "endian.h"
 #include "init.h"
 #include "resource.h"
 

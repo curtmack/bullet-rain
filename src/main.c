@@ -62,6 +62,9 @@ const char menu[TEST_MENU_SIZE][32] = {
     "Resource loader test",
     "Quit the system test"
 };
+    
+const SDL_Color off = {255, 255, 255}; /* white   */
+const SDL_Color on  = {255,   0,   0}; /* red     */
 
 #define rectset(rect,nx,ny,nw,nh) rect.x=nx;rect.y=ny;rect.w=nw;rect.h=nh
 
@@ -70,11 +73,6 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     brmenu *brm;
     
     int i, menu_x, menu_y, menu_width, menu_height;
-    
-    const SDL_Color off = {255, 255, 255}; /* white   */
-    const SDL_Color on  = {255,   0,   0}; /* red     */
-    
-    Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
     
     char versionstring[64];
     
@@ -85,6 +83,7 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     SDL_Surface *ons [5];
     
     SDL_Rect rect, offsrc, offdst, onsrc, ondst;
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
     
     offs[0] = TTF_RenderText_Solid(font, menu[0], off);
     ons [0] = TTF_RenderText_Solid(font, menu[0], on );
@@ -189,6 +188,10 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     /* Link all the entries together */
     menu_link_entries(brm);
     
+    /* Clear surfaces */
+    SDL_FreeSurface(logoimg);
+    SDL_FreeSurface(version);
+    
     return brm;
 }
 
@@ -230,6 +233,7 @@ int main(int nargs, char *args[])
     panic(!init_all(), "Error initializing engine subsystems");
     
     font = TTF_OpenFont("res/monofont.ttf", 16);
+    panic(font != NULL, "Couldn't load res/monofont.ttf");
     
     screen = SDL_SetVideoMode(640, 480, 32, SDL_SWSURFACE);
     panic(screen != NULL, "Error setting up video mode");
@@ -243,7 +247,10 @@ int main(int nargs, char *args[])
     while (!finished) {
         start_menu(brm);
         drawthread = SDL_CreateThread(&_drawthread, brm);
-        wait_on_menu(brm);
+        while (brm->running == TRUE) {
+            menu_action(brm, get_action());
+            SDL_Delay(10);
+        }
         
         switch (brm->end) {
             case TEST_FIXED:
@@ -277,36 +284,374 @@ int main(int nargs, char *args[])
     return 0;
 }
 
-inline void print_fixed(fixed_t a)
-{
-    printf("%d and %d/65536\n", intpart(a), fracpart(a));
-}
-
-#define FIXED_TESTS 20
 void fixed_test(SDL_Surface *surface, TTF_Font *font)
 {
-    fixed_t a,b;
+    int values[4] = {0, 0, 0, 0};
+    fixed_t a = fixzero, b = fixzero, result = fixzero;
+    
+    enum {
+        FIXED_TEST_AI,
+        FIXED_TEST_AF,
+        FIXED_TEST_BI,
+        FIXED_TEST_BF,
+        FIXED_TEST_OP
+    } selected = FIXED_TEST_AI;
+    
+    enum {
+        FIXED_TEST_ADD,
+        FIXED_TEST_SUB,
+        FIXED_TEST_MUL,
+        FIXED_TEST_DIV
+    } op = FIXED_TEST_ADD;
+    
+    char buffer[32];
+    char numbuf[8] = "\0\0\0\0\0\0\0\0";
+    char entry[8] = "0\0\0\0\0\0\0\0";
+    int cursor = 1;
+    int len    = 1;
     int i;
-
-    for (i=0; i<FIXED_TESTS; ++i) {
-        /* generate random a,b */
-        a = tofixed(rand()%1024-512,rand()%65536);
-        b = tofixed(rand()%1024-512,rand()%65536);
-
-        printf("  A: ");
-        print_fixed(a);
-        printf("  B: ");
-        print_fixed(b);
-        printf("A+B: ");
-        print_fixed(a+b);
-        printf("A-B: ");
-        print_fixed(a-b);
-        printf("A*B: ");
-        print_fixed(fixmul(a,b));
-        printf("A/B: ");
-        print_fixed(fixdiv(a,b));
-        puts("");
+    int update = TRUE;
+    int divzero = FALSE;
+    SDL_Surface *back, *tmp;
+    SDL_Rect rect;
+    SDL_Event event;
+    
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
+    
+    /* Start setting up background */
+    back = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h,
+                                surface->format->BitsPerPixel,
+                                surface->format->Rmask, surface->format->Gmask,
+                                surface->format->Bmask, surface->format->Amask);
+    
+    rectset(rect,0,0,surface->w,surface->h);
+    SDL_FillRect(back,&rect,bg);
+    
+    /* Draw in instructions */
+    tmp = TTF_RenderText_Solid(font, "Up/Down: Select number", off);
+    rectset(rect,0,back->h-72,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    tmp = TTF_RenderText_Solid(font, "Type selected number with keyboard", off);
+    rectset(rect,0,back->h-54,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    tmp = TTF_RenderText_Solid(font, "Choose operation with left/right", off);
+    rectset(rect,0,back->h-36,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    tmp = TTF_RenderText_Solid(font, "Escape: Exit to menu", off);
+    rectset(rect,0,back->h-18,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    /*
+     * This isn't a menu because it would be difficult to get a brmenu
+     * to do what we need it to here
+     */
+    SDL_EnableUNICODE(1);
+    while (TRUE) {
+        /* Draw everything */
+        rectset(rect, 0, 0, 0, 0);
+        SDL_BlitSurface(back, NULL, surface, &rect);
+        
+        for (i = 0; i < 4; ++i) {
+            if (i == selected) {
+                /* Draw the cursor */
+                tmp = TTF_RenderText_Solid(font, "0", off);
+                rectset(rect,(tmp->w)*(cursor+4),i*18,tmp->w,18);
+                SDL_FillRect(surface, &rect,
+                        SDL_MapRGB(surface->format, 255, 0, 0)); /* red */
+                
+                /* Now draw the text */
+                switch (i) {
+                    case 0:
+                        sprintf(buffer, "ai: %s", entry);
+                        break;
+                    case 1:
+                        sprintf(buffer, "af: %s", entry);
+                        break;
+                    case 2:
+                        sprintf(buffer, "bi: %s", entry);
+                        break;
+                    case 3:
+                        sprintf(buffer, "bf: %s", entry);
+                        break;
+                }
+                SDL_FreeSurface(tmp);
+                tmp = TTF_RenderText_Solid(font, buffer, off);
+                rectset(rect, 0, i*18, 0, 0);
+                SDL_BlitSurface(tmp, NULL, surface, &rect);
+                SDL_FreeSurface(tmp);
+            }
+            else {
+                /* Just draw it */
+                itoa(values[i], numbuf, 10);
+                switch (i) {
+                    case 0:
+                        sprintf(buffer, "ai: %s", numbuf);
+                        break;
+                    case 1:
+                        sprintf(buffer, "af: %s", numbuf);
+                        break;
+                    case 2:
+                        sprintf(buffer, "bi: %s", numbuf);
+                        break;
+                    case 3:
+                        sprintf(buffer, "bf: %s", numbuf);
+                        break;
+                }
+                tmp = TTF_RenderText_Solid(font, buffer, off);
+                rectset(rect, 0, i*18, 0, 0);
+                SDL_BlitSurface(tmp, NULL, surface, &rect);
+                SDL_FreeSurface(tmp);
+            }
+        }
+        
+        /* Draw the op */
+        if (selected == FIXED_TEST_OP) {
+            /* Draw a selection rectangle */
+            tmp = TTF_RenderText_Solid(font, "0", off);
+            rectset(rect,(tmp->w)*4,72,(tmp->w)*3,18);
+            SDL_FillRect(surface, &rect,
+                        SDL_MapRGB(surface->format, 255, 0, 0)); /* red */
+            SDL_FreeSurface(tmp);
+        }
+        switch (op) {
+            case FIXED_TEST_ADD:
+                tmp = TTF_RenderText_Solid(font, "op:  +", off);
+                break;
+            case FIXED_TEST_SUB:
+                tmp = TTF_RenderText_Solid(font, "op:  -", off);
+                break;
+            case FIXED_TEST_MUL:
+                tmp = TTF_RenderText_Solid(font, "op:  *", off);
+                break;
+            case FIXED_TEST_DIV:
+                tmp = TTF_RenderText_Solid(font, "op:  /", off);
+                break;
+        }
+        rectset(rect,0,72,0,0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+        SDL_FreeSurface(tmp);
+        
+        /* Draw the result */
+        sprintf(buffer, "result: (%d + %d/65536)", intpart(result), fracpart(result));
+        tmp = TTF_RenderText_Solid(font, buffer, off);
+        rectset(rect,surface->w - tmp->w, 0, 0, 0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+        SDL_FreeSurface(tmp);
+        
+        /* Draw division by zero warning */
+        if (divzero) {
+            tmp = TTF_RenderText_Solid(font, "Division by zero", on);
+            rectset(rect,surface->w - tmp->w, 18, 0, 0);
+            SDL_BlitSurface(tmp, NULL, surface, &rect);
+            SDL_FreeSurface(tmp);
+        }
+        
+        /* Update the screen */
+        SDL_Flip(surface);
+        
+        SDL_WaitEvent(&event);
+        if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                break;
+            }
+            /* It's just simpler to check this first */
+            if (selected == FIXED_TEST_OP) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_UP:
+                        selected = FIXED_TEST_BF;
+                        /* Set up the new selection */
+                        itoa(values[selected], entry, 10);
+                        len = strlen(entry);
+                        if (len > 5) {
+                            entry[5] = '\0';
+                            len = 5;
+                            cursor = 5;
+                        } 
+                        else {
+                            cursor = len;
+                        }
+                        update = TRUE;
+                        break;
+                    case SDLK_DOWN:
+                        selected = FIXED_TEST_AI;
+                        itoa(values[selected], entry, 10);
+                        len = strlen(entry);
+                        if (len > 5) {
+                            entry[5] = '\0';
+                            len = 5;
+                            cursor = 5;
+                        } 
+                        else {
+                            cursor = len;
+                        }
+                        update = TRUE;
+                        break;
+                    case SDLK_LEFT:
+                        if (op == FIXED_TEST_ADD) {
+                            op = FIXED_TEST_DIV;
+                        }
+                        else {
+                            --op;
+                        }
+                        break;
+                    case SDLK_RIGHT:
+                        if (op == FIXED_TEST_DIV) {
+                            op = FIXED_TEST_ADD;
+                        }
+                        else {
+                            ++op;
+                        }
+                        break;
+                    case SDLK_RETURN:
+                        /* Update without moving */
+                        update = TRUE;
+                        break;
+                    default:
+                        /* do nothing */
+                        break;
+                }
+            }
+            else {
+                /* We're in typing mode */
+                switch(event.key.keysym.sym) {
+                    case SDLK_UP:
+                    case SDLK_DOWN:
+                        /* 
+                         * These are mostly the same, set the new value
+                         * and then change selected
+                         * Up or down only matters at the end
+                         */
+                        /* Set new value */
+                        values[selected] = atoi(entry);
+                        
+                        /* Clear out entry */
+                        for (i = 0; i < 8; ++i) {
+                            entry[i] = '\0';
+                        }
+                        
+                        /* Go to next entry */
+                        if (event.key.keysym.sym == SDLK_UP) {
+                            if (selected == FIXED_TEST_AI) {
+                                selected = FIXED_TEST_OP;
+                            }
+                            else --selected;
+                        }
+                        else {
+                            /* If we had op selected, we wouldn't be here */
+                            ++selected;
+                        }
+                        
+                        /* Are we on an input row? */
+                        if (selected != FIXED_TEST_OP) {
+                            /* Set up the new selection */
+                            itoa(values[selected], entry, 10);
+                            len = strlen(entry);
+                            if (len > 5) {
+                                entry[5] = '\0';
+                                len = 5;
+                                cursor = 5;
+                            } 
+                            else {
+                                cursor = len;
+                            }
+                        }
+                        /* We're ready now */
+                        update = TRUE;
+                        break;
+                        
+                    case SDLK_RETURN:
+                        /* Update without moving */
+                        update = TRUE;                  
+                        break;
+                        
+                    case SDLK_LEFT:
+                        if (cursor > 0) {
+                            --cursor;
+                        }
+                        break;
+                    case SDLK_RIGHT:
+                        if (cursor < len && cursor < 4) {
+                            ++cursor;
+                        }
+                        break;
+                    
+                    case SDLK_BACKSPACE:
+                        /* tee hee i'm a clever pony */
+                        if (cursor > 0) --cursor;
+                        else break;
+                    case SDLK_DELETE:
+                        /* Bring everything over to the left */
+                        for (i = cursor; i < len; ++i) {
+                            entry[i] = entry[i+1];
+                        }
+                        break;
+                    default:
+                        /* 
+                         * Does it have a unicode component?
+                         * We need to check for this last because some
+                         * of the above characters have a unicode point
+                         * (e.g. '\b' for SDLK_BACKSPACE)
+                         */
+                        if (event.key.keysym.unicode != 0) {
+                            /* Only allow digits */
+                            if ((char)event.key.keysym.unicode >= '0' &&
+                                (char)event.key.keysym.unicode <= '9') {
+                                entry[cursor] = (char)event.key.keysym.unicode;
+                                if (cursor < 5) ++cursor;
+                                if (cursor > len) ++len;
+                                entry[len] = '\0';
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+            
+        /* Do we need to update the math? */
+        if (update) {
+            a = tofixed(values[0], values[1]);
+            b = tofixed(values[2], values[3]);
+            switch (op) {
+                case FIXED_TEST_ADD:
+                    result = a+b;
+                    divzero = FALSE;
+                    break;
+                case FIXED_TEST_SUB:
+                    result = a-b;
+                    divzero = FALSE;
+                    break;
+                case FIXED_TEST_MUL:
+                    result = fixmul(a,b);
+                    divzero = FALSE;
+                    break;
+                case FIXED_TEST_DIV:
+                    result = fixdiv(a,b);
+                    if (b == fixzero) {
+                        divzero = TRUE;
+                    }
+                    else {
+                        divzero = FALSE;
+                    }
+                    break;
+            }
+            /* don't need to update again */
+            update = FALSE;
+        }
+        
+        /* Wait a bit */
+        SDL_Delay(20);
+        
+        /* And continue looping */
     }
+    /* Disable unicode conversion */
+    SDL_EnableUNICODE(0);
 }
 
 #define DIAMETER 760
@@ -364,26 +709,143 @@ void geom_test(SDL_Surface *surface, TTF_Font *font)
 
 void hash_test(SDL_Surface *surface, TTF_Font *font)
 {
-    char a[64];
-    sid_t hash;
+    char entry[32] = "";
+    char prev[32]  = "";
+    char hashbuf[12] = "";
+    sid_t hash = (sid_t)0x00000000; /* sid of the empty string */
+    int cursor = 0;
+    int len = 0;
+    int i;
+    SDL_Surface *back, *tmp;
+    SDL_Rect rect;
+    SDL_Event event;
+
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
     
-    while (1) {
-        puts("Enter a string to hash (blank line quits):");
-        fgets(a, 64, stdin);
-        clip_string(a);
-        if (a[0] == '\0') {
-            puts("Okay, exiting hash test.");
-            break;
+    /* Set up the background */
+    back = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h,
+                                surface->format->BitsPerPixel,
+                                surface->format->Rmask, surface->format->Gmask,
+                                surface->format->Bmask, surface->format->Amask);
+    
+    rectset(rect,0,0,surface->w,surface->h);
+    SDL_FillRect(back,&rect,bg);
+    
+    /* Draw in instructions */
+    tmp = TTF_RenderText_Solid(font, "Type in string to hash", off);
+    rectset(rect,0,back->h-54,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    tmp = TTF_RenderText_Solid(font, "Press enter to calculate hash", off);
+    rectset(rect,0,back->h-36,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    tmp = TTF_RenderText_Solid(font, "Escape: Exit to menu", off);
+    rectset(rect,0,back->h-18,0,0);
+    SDL_BlitSurface(tmp,NULL,back,&rect);
+    SDL_FreeSurface(tmp);
+    
+    /* Need unicode enabled */
+    SDL_EnableUNICODE(1);
+    while (TRUE) {
+        /* Update the screen */
+        rectset(rect,0,0,0,0);
+        SDL_BlitSurface(back, NULL, surface, &rect);
+        
+        /* Draw the cursor */
+        /* This assumes the font is indeed monospaced */
+        tmp = TTF_RenderText_Solid(font, "0", off);
+        rectset(rect,(tmp->w)*cursor,0,tmp->w,18);
+        /* red */
+        SDL_FillRect(surface, &rect, SDL_MapRGB(surface->format, 255, 0, 0));
+        SDL_FreeSurface(tmp);
+        
+        /* Draw the entry text */
+        tmp = TTF_RenderText_Solid(font, entry, off);
+        rectset(rect, 0, 0, 0, 0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+        SDL_FreeSurface(tmp);
+        
+        /* Draw the hash text */
+        tmp = TTF_RenderText_Solid(font, prev, off);
+        if (tmp == NULL) {
+            /* This happens if the string is empty */
+            tmp = TTF_RenderText_Solid(font, "(Empty string)", on);
         }
+        rectset(rect, surface->w - tmp->w, 0, 0, 0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+        SDL_FreeSurface(tmp);
         
-        hash = calculate_sid(a);
+        /* Draw the hash */
+        sprintf(hashbuf, "0x%08x", (int)hash);
+        tmp = TTF_RenderText_Solid(font, hashbuf, on);
+        rectset(rect, surface->w - tmp->w, tmp->h, 0, 0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+        SDL_FreeSurface(tmp);
         
-        /* 
-         * note: this may cause warnings if Uint32 is not vanilla int
-         * but it won't hurt anything, god willing
-         */
-        printf("SID of '%s' is %08x\n", a, (Uint32)hash);
+        /* Update the screen */
+        SDL_Flip(surface);
+        
+        /* Check input */
+        SDL_WaitEvent(&event);
+        if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                break;
+            }
+            else {
+                /* Motion */
+                switch(event.key.keysym.sym) {
+                    case SDLK_LEFT:
+                        if (cursor > 0) {
+                            --cursor;
+                        }
+                        break;
+                    case SDLK_RIGHT:
+                        if (cursor < len && cursor < 31) {
+                            ++cursor;
+                        }
+                        break;
+                    
+                    case SDLK_BACKSPACE:
+                        /* tee hee i'm a clever pony */
+                        if (cursor > 0) --cursor;
+                        else break;
+                    case SDLK_DELETE:
+                        /* Bring everything over to the left */
+                        for (i = cursor; i < len; ++i) {
+                            entry[i] = entry[i+1];
+                        }
+                        break;
+                    case SDLK_RETURN:
+                        /* Update the hash */
+                        hash = calculate_sid(entry);
+                        strcpy(prev, entry);
+                        entry[0] = '\0';
+                        cursor = 0;
+                        len = 0;
+                        break;
+                    default:
+                        /* 
+                         * Does it have a unicode component?
+                         * We need to check for this last because some of
+                         * the keys above have a unicode point (e.g.
+                         * '\b' for SDLK_BACKSPACE)
+                         */
+                        if (event.key.keysym.unicode != 0) {
+                            entry[cursor] = (char)event.key.keysym.unicode;
+                            if (cursor < 31) ++cursor; /* need room for nul */
+                            if (cursor > len) ++len;
+                            entry[len] = '\0';
+                        }
+                        break;
+                }
+            }
+        }
     }
+    /* Disable unicode conversion */
+    SDL_EnableUNICODE(0);
 }
 
 void print_res(resource *res)
