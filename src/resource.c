@@ -50,7 +50,7 @@ void clip_string(char *a)
 
 /*
  * Gets the extension of a filename
- * everything after the last dot, or everything if there is no dot
+ * everything after and including the last dot, or everything if there is no dot
  * Used to detect filetype
  */
 char *get_ext(char *a)
@@ -97,7 +97,6 @@ sid_t calculate_sid(char *string)
 
 /* arclist chain */
 arclist *arc_head = NULL;
-arclist *arc_tail = NULL;
 SDL_mutex *arc_lock;
 
 /* For creating human-readable description of what I'm doing */
@@ -160,7 +159,7 @@ void _doctor_resource(resource *res)
 }
 
 /* Get an archive from the arclist chain */
-inline arclist *_get_arc_from_chain(sid_t id)
+inline arclist *_get_arc_from_chain(sid_t id, char *arcname)
 {
     arclist *temparc;
     int r;
@@ -169,6 +168,11 @@ inline arclist *_get_arc_from_chain(sid_t id)
     check_mutex(r);
     for(temparc = arc_head; temparc != NULL && temparc->id != id;
         temparc = temparc->next);
+    /* Check the strings too, because I'm paranoid */
+    for(; temparc != NULL && (r = strcmp(temparc->name, arcname)) < 0;
+        temparc = temparc->next);
+    /* Did we miss it? */
+    if (r > 0) temparc = NULL;
     r = SDL_mutexV(arc_lock);
     check_mutex(r);
     return temparc;
@@ -178,8 +182,8 @@ inline arclist *_get_arc_from_chain(sid_t id)
 arclist *load_arc(char *arcname)
 {
     int i, r;
-    arclist *newarclist;
-    resource *newresource, *tempres;
+    arclist *newarclist, *curr, *prev;
+    resource *newresource, *tempres, *prevres;
     sid_t reshash, temphash;
     void *tempdat;
     char *tempname;
@@ -191,7 +195,7 @@ arclist *load_arc(char *arcname)
     
     temphash = calculate_sid(arcname);
     /* Do we already have this arclist in memory? */
-    if ((newarclist = _get_arc_from_chain(temphash))) {
+    if ((newarclist = _get_arc_from_chain(temphash, arcname))) {
         debug("Archive found in arc chain");
         /* And is it loaded? */
         r = SDL_mutexP(newarclist->_lock);
@@ -228,8 +232,6 @@ arclist *load_arc(char *arcname)
         /* Prepare other stuff */
         strcpy(newarclist->name, arcname);
         newarclist->id = temphash;
-        /* wherever it goes, this is correct */
-        newarclist->next = NULL;
         for (i = 0; i < ARCLIST_HASH_SIZE; ++i) {
             newarclist->map[i] = NULL;
         }
@@ -240,16 +242,25 @@ arclist *load_arc(char *arcname)
         if (arc_head) {
             /* 
              * List is not currently empty - add it
-             * We COULD sort these, but there are only like seven
-             * archives, so why bother?
+             * We need it sorted to make the string checks more efficient
              */
-             arc_tail->next = newarclist;
-             arc_tail = newarclist;
+            curr = arc_head;
+            prev = curr;
+            for (; curr != NULL && curr->id < temphash;
+                prev = curr, curr = curr->next);
+            if (curr->id == temphash) {
+                /* Settle hash ties via strcmp */
+                for (; curr != NULL && strcmp(curr->name, arcname) < 0;
+                    prev = curr, curr = curr->next);
+            }
+            /* Now we should be at the right place */
+            prev->next = newarclist;
+            newarclist->next = curr;
         }
         else {
             /* List is empty - make it */
             arc_head = newarclist;
-            arc_tail = newarclist;
+            newarclist->next = NULL;
         }
         r = SDL_mutexV(arc_lock);
         check_mutex(r);
@@ -379,12 +390,25 @@ arclist *load_arc(char *arcname)
         /* Store it in arclist */
         tempres = newarclist->map[reshash%ARCLIST_HASH_SIZE];
         if (tempres) {
-            /* List is not empty - add it */
-            /* We don't care about sorting this one either */
-            for (; tempres != NULL; tempres = tempres->next);
-            
-            newresource->next = tempres->next;
-            tempres->next = newresource;
+            /* 
+             * List is not empty - add it 
+             * Again, need to sort it to make hash collisions less painful
+             * via string checks
+             *
+             * Thanks to the if, we know tempres != NULL on the first
+             * iteration, so we don't need to worry about intializing prevres
+             */
+            for (; tempres != NULL && tempres->id < reshash;
+                prevres = tempres, tempres = tempres->next);
+            if (tempres->id == reshash) {
+                /* String checks ahoy! */
+                for (; tempres != NULL &&
+                    strcmp(tempres->name, newresource->name) < 0;
+                    prevres = tempres, tempres = tempres->next);
+            }
+            /* And now we're in position */
+            prevres->next = newresource;
+            newresource->next = tempres;
         }
         else {
             /* list is empty - make it */
@@ -506,7 +530,7 @@ void _free_arc(arclist *arc)
  */
 void free_arc(char *arcname)
 {
-    _free_arc(_get_arc_from_chain(calculate_sid(arcname)));
+    _free_arc(_get_arc_from_chain(calculate_sid(arcname), arcname));
 }
 
 /* Retrieve something that's been loaded */
@@ -517,7 +541,7 @@ arclist *get_arc(char *arcname)
     int r;
     
     archash = calculate_sid(arcname);
-    temp = _get_arc_from_chain(archash);
+    temp = _get_arc_from_chain(archash, arcname);
     if (temp) {
         /* If it's being worked on, wait */
         r = SDL_mutexP(temp->_lock);
@@ -543,8 +567,7 @@ resource *get_res(char *arcname, char *resname)
     temparc = get_arc(arcname); 
     /* Was the arclist freed? */
     if (!(temparc->loaded)) {
-        /* We know we want to warn here */
-        warn2(0, "Arclist was loaded but has since been freed, reloading:",
+        warn2(FALSE, "Arclist was loaded but has since been freed, reloading:",
                 arcname);
         temparc = load_arc(arcname);
     }
@@ -554,20 +577,45 @@ resource *get_res(char *arcname, char *resname)
     r = SDL_mutexP(temparc->_lock);
     check_mutex(r);
     for (tempres = temparc->map[reshash%ARCLIST_HASH_SIZE];
-         tempres != NULL && tempres->id != reshash; tempres = tempres->next);
+         tempres != NULL && tempres->id < reshash; tempres = tempres->next);
+    
+    /* Did we reach the end of the list? */
+    if (!tempres) {
+        r = SDL_mutexV(temparc->_lock);
+        check_mutex(r);
+        warn2(FALSE, "Arclist didn't have the requested resource:", resname);
+        return NULL;
+    }
+    
+    /* If there's a hash tie, check for strings */
+    if (tempres->id == reshash) {
+        for(; tempres != NULL && strcmp(tempres->name, resname) < 0;
+            tempres = tempres->next);
+        /* Did we go too far? */
+        if (strcmp(tempres->name, resname) > 0) {
+            tempres = NULL;
+        }
+    }
+    /* Did we go too far? */
+    else if (tempres->id > reshash) {
+        tempres = NULL;
+    }
+    
     r = SDL_mutexV(temparc->_lock);
     check_mutex(r);
     
-    if (tempres) {
-        /* If it's being worked on, wait */
-        r = SDL_mutexP(tempres->_lock);
-        check_mutex(r);
-        r = SDL_mutexV(tempres->_lock);
-        check_mutex(r);
+    /* Check again for NULL, since we may have set NULL since then */
+    if (!tempres) {
+        warn2(FALSE, "Arclist didn't have the requested resource:", resname);
+        return NULL;
     }
-    warn2(tempres,
-            "Arclist was loaded but it didn't have the requested resource:",
-            resname);
+    
+    /* If it's being worked on, wait */
+    r = SDL_mutexP(tempres->_lock);
+    check_mutex(r);
+    r = SDL_mutexV(tempres->_lock);
+    check_mutex(r);
+    
     return tempres;
 }
 
@@ -611,7 +659,7 @@ void stop_resources(void)
         free(temparc);
         temparc = nextarc;
         
-        debug("Arclist freed (can't display name, it's gone)");
+        debug("Arclist freed");
     }
     r = SDL_mutexV(arc_lock);
     check_mutex(r);

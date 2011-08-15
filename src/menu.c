@@ -281,7 +281,7 @@ void destroy_menu(brmenu *brm)
         /* Politely tell the thread to stop */
         r = SDL_mutexP(brm->_lock);
         check_mutex(r);
-        brm->running = 0;
+        brm->running = FALSE;
         r = SDL_mutexV(brm->_lock);
         check_mutex(r);
         SDL_WaitThread(brm->thread, NULL);
@@ -308,7 +308,11 @@ void destroy_menu(brmenu *brm)
 }
 
 
-/* Handle input and process it into a menu action */
+/* 
+ * Handle input and process it into a menu action 
+ * This has to be run by the main thread that created the window
+ * for compatibility with e.g. Windows
+ */
 brmenu_action get_action(void)
 {
     int r;
@@ -317,7 +321,7 @@ brmenu_action get_action(void)
     
     r = SDL_PollEvent(&event);
     if (r != 0) {
-        /* We really only care about key and joystick events */
+        /* We really only care about key events */
         /* TODO: Tie this into the input system so it can be configured */
         switch(event.type) {
             case SDL_KEYDOWN:
@@ -418,7 +422,9 @@ int _menu_runner(void *data)
         switch (me->action) {
             case DO_NOTHING:
                 /* we do nothing, obviously */
-                break;                case DO_UP:
+                break;
+            
+            case DO_UP:
                 if (me->selected->up != NULL) {
                     temp = me->selected->up;
                     me->selected->selected = FALSE;
@@ -561,8 +567,8 @@ int _menu_runner(void *data)
                     me->running = FALSE;
                 }
                 break;
-            }
-            
+        }
+        
         /* Reset */
         me->action = DO_NOTHING;
         

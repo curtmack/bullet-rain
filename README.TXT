@@ -47,12 +47,12 @@ be fine as they are, but you might need to tweak the variables at the
 beginning:
 
  - CC:     The name (including path if necessary) of a C compiler. The
-           make process assumes it supports GCC-like commandline switches
+           make process assumes it supports gcc-like commandline switches
            for specifying output file, compilation mode, etc. In fact,
-           maybe you should just use GCC.
+           maybe you should just use gcc.
  - CFLAGS: Miscellaneous commandline flags given to CC.
  - LINK:   The name of a linker that accepts whatever object format CC
-           spits out. NOTE: This varies for different C compilers. GCC,
+           spits out. NOTE: This varies for different C compilers. gcc,
            for example, requires that you send .o files through gcc
            rather than directly through ld, because gcc has some built-in
            libraries it passes to ld. In this case, you should use gcc as
@@ -61,7 +61,7 @@ beginning:
  - LIBS:   Commandline switches given to the compiler to import the
            necessary libraries. This should be fine as-is.
  - BIN:    The name of the output file. Include a .exe if your system
-           requires it. "bullet-hell-debug" is the standard base, but of
+           requires it. "bullet-hell" is the standard base, but of
            course you can use whatever you fancy.
  - RM:     A program that deletes files specified on its commandline.
            Used for "make clean." rm -f or del are the usual options.
