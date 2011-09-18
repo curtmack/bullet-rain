@@ -13,6 +13,7 @@
 
 #include "init.h"
 #include "resource.h"
+#include "bullet.h"
 
 #ifdef INCLUDE_SDL_PREFIX
 #include "SDL/SDL.h"
@@ -30,12 +31,14 @@ int init_all(void)
     SDL_Init(SDL_INIT_EVERYTHING);
     IMG_Init(IMG_INIT_PNG);
     TTF_Init();
+    init_bullets();
     
     return 0;
 }
 
 int stop_all(void)
 {
+    stop_bullets();
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();

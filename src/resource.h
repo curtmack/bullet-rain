@@ -81,7 +81,11 @@ typedef enum {
 
 typedef struct resource resource;
 struct resource {
-    Sint64   size; /* yeah that's the form libarchive gives it to us in */
+    /* 
+     * libarchive gives this as an int64_t, Sint64 is exactly the same so
+     * we'll use that for consistency, C compilers won't care
+     */
+    Sint64    size;
     
     resource *next;
     char      name[16];

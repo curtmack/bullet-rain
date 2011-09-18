@@ -18,13 +18,19 @@
 #include "debug.h"
 #include <stdint.h>
 
+#ifdef INCLUDE_SDL_PREFIX
+#include "SDL/SDL.h"
+#else
+#include "SDL.h"
+#endif
+
 /*
  * We're going to roll our own solution here
  * We could use _Fract, _Accum types, but they're too finicky
  * and don't guarantee what size the integral part will be
  * Here, we're always using 16.16 numbers
  */
-typedef int32_t fixed_t;
+typedef Sint32 fixed_t;
 
 /*
  * For the most part, everything works like you'd expect
@@ -34,7 +40,9 @@ typedef int32_t fixed_t;
 
 /* constants */
 #define fixzero ((fixed_t)0x00000000)
-#define fixone  ((fixed_t)0x00010000);
+#define fixone  ((fixed_t)0x00010000)
+#define fixmax  ((fixed_t)0x7FFFFFFF) /* two's complement signing */
+#define fixmin  ((fixed_t)0x80000000) /* makes these work out this way */
 
 /* increment and decrement */
 #define fixinc(a) (a += fixone)
@@ -53,8 +61,8 @@ typedef int32_t fixed_t;
  * Things can get a bit tricky with 2's complement, so we
  * double-negative to work around it
  */
-#define intpart(a) (a>=0 ? (int)((a)>>16) : -(int)((-a)>>16))
-#define fracpart(a) (a>=0 ? (int)(a&0x0000FFFF) : -(int)((-a)&0x0000FFFF))
+#define intpart(a) ((int)((a)>>16))
+#define fracpart(a) ((int)((a)&0x0000FFFF))
 
 /* These have to be functions for the memory used for temp */
 extern fixed_t fixmul(fixed_t a, fixed_t b);

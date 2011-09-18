@@ -17,6 +17,7 @@
 
 #ifdef SYSTEM_TEST
 
+#include "bullet.h"
 #include "debug.h"
 #include "fixed.h"
 #include "geometry.h"
@@ -29,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 
 #ifdef INCLUDE_SDL_PREFIX
 #include "SDL/SDL.h"
@@ -44,20 +46,26 @@ void fixed_test(SDL_Surface *surface, TTF_Font *font);
 void geom_test(SDL_Surface *surface, TTF_Font *font);
 void hash_test(SDL_Surface *surface, TTF_Font *font);
 void res_test(SDL_Surface *surface, TTF_Font *font);
+void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font);
+void bull_test_collision(SDL_Surface *surface, TTF_Font *font);
 
-#define TEST_MENU_SIZE 5
+#define TEST_MENU_SIZE 7
 
-#define TEST_FIXED 0
-#define TEST_GEOM  1
-#define TEST_HASH  2
-#define TEST_RES   3
-#define TEST_QUIT  4
+#define TEST_FIXED     0
+#define TEST_GEOM      1
+#define TEST_HASH      2
+#define TEST_RES       3
+#define TEST_FAKEBULL  4
+#define TEST_COLLISION 5
+#define TEST_QUIT      6
 
 const char menu[TEST_MENU_SIZE][32] = {
     "Fixed-point arithmetic test",
     "Trigonometry test",
     "String hashing test",
     "Resource loader test",
+    "Bullet test - fake pipeline",
+    "Bullet test - collision",
     "Quit the system test"
 };
     
@@ -77,8 +85,8 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     SDL_Surface *back;
     SDL_Surface *logoimg;
     SDL_Surface *version;
-    SDL_Surface *offs[5];
-    SDL_Surface *ons [5];
+    SDL_Surface *offs[7];
+    SDL_Surface *ons [7];
     
     SDL_Rect rect, offsrc, offdst, onsrc, ondst;
     const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
@@ -93,6 +101,10 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     ons [3] = TTF_RenderText_Solid(font, menu[3], on );
     offs[4] = TTF_RenderText_Solid(font, menu[4], off);
     ons [4] = TTF_RenderText_Solid(font, menu[4], on );
+    offs[5] = TTF_RenderText_Solid(font, menu[5], off);
+    ons [5] = TTF_RenderText_Solid(font, menu[5], on );
+    offs[6] = TTF_RenderText_Solid(font, menu[6], off);
+    ons [6] = TTF_RenderText_Solid(font, menu[6], on );
     
     /* 
      * This just makes an empty surface the same size and format as our screen
@@ -172,7 +184,7 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     rectset(offdst, menu_x, menu_y, 0, 0 );
     rectset(onsrc, 0, 0, ons[3]->w, ons[3]->h );
     rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_RES, TEST_HASH, TEST_QUIT, -1, -1,
+    menu_add_entry(brm, TEST_RES, TEST_HASH, TEST_FAKEBULL, -1, -1,
                    offs[3], offsrc, offdst, ons[3], onsrc, ondst);
     menu_y += offs[3]->h;
     
@@ -180,8 +192,24 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     rectset(offdst, menu_x, menu_y, 0, 0 );
     rectset(onsrc, 0, 0, ons[4]->w, ons[4]->h );
     rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_QUIT, TEST_RES, TEST_FIXED, -1, -1,
+    menu_add_entry(brm, TEST_FAKEBULL, TEST_RES, TEST_COLLISION, -1, -1,
                    offs[4], offsrc, offdst, ons[4], onsrc, ondst);
+    menu_y += offs[4]->h;
+    
+    rectset(offsrc, 0, 0, offs[5]->w, offs[5]->h);
+    rectset(offdst, menu_x, menu_y, 0, 0 );
+    rectset(onsrc, 0, 0, ons[5]->w, ons[5]->h );
+    rectset(ondst, menu_x, menu_y, 0, 0 );
+    menu_add_entry(brm, TEST_COLLISION, TEST_FAKEBULL, TEST_QUIT, -1, -1,
+                   offs[5], offsrc, offdst, ons[5], onsrc, ondst);
+    menu_y += offs[5]->h;
+    
+    rectset(offsrc, 0, 0, offs[6]->w, offs[6]->h);
+    rectset(offdst, menu_x, menu_y, 0, 0 );
+    rectset(onsrc, 0, 0, ons[6]->w, ons[6]->h );
+    rectset(ondst, menu_x, menu_y, 0, 0 );
+    menu_add_entry(brm, TEST_QUIT, TEST_COLLISION, TEST_FIXED, -1, -1,
+                   offs[6], offsrc, offdst, ons[6], onsrc, ondst);
     
     /* Link all the entries together */
     menu_link_entries(brm);
@@ -222,13 +250,14 @@ int main(int argc, char *argv[])
 {
     int finished = FALSE;
     brmenu *brm;
-    arclist *logos;
+    arclist *core;
     resource *corner_logo;
     SDL_Surface *screen = NULL;
     SDL_Thread  *drawthread = NULL;
     TTF_Font *font = NULL;
 
     srand((int) time(NULL));
+    printf("%x %x\n", INT_MIN, INT_MAX);
     
     panic(!init_all(), "Error initializing engine subsystems");
     
@@ -239,8 +268,8 @@ int main(int argc, char *argv[])
     panic(screen != NULL, "Error setting up video mode");
     SDL_WM_SetCaption("BULLET RAIN ENGINE TEST", NULL);
     
-    logos = load_arc("res/brcore.tgz");
-    corner_logo = get_res("res/brcore.tgz", "logosm.png");
+    core = load_arc("res/brcore.tgz");
+    corner_logo = get_res("res/brcore.tgz", "logosmbk.png");
     
     brm = construct_menu(screen, font, corner_logo);
 
@@ -268,6 +297,12 @@ int main(int argc, char *argv[])
                 break;
             case TEST_RES:
                 res_test(screen, font);
+                break;
+            case TEST_FAKEBULL:
+                bull_test_fake_proc(screen, font);
+                break;
+            case TEST_COLLISION:
+                bull_test_collision(screen, font);
                 break;
             case TEST_QUIT:
                 finished = TRUE;
@@ -996,6 +1031,493 @@ void res_test(SDL_Surface *surface, TTF_Font *font)
     
     puts("Test done!");
     puts("Leaving archive in memory.");
+}
+
+
+void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
+{
+    bullet *tmp;
+    
+    bullet_type sm[12];
+    bullet_type lg[12];
+    
+    rect_point vel, pt;
+    
+    int i, bullets_made = 0, numbullets = 0;
+    Uint32 frame = 0, time = 0, lasttime = SDL_GetTicks(), newtime;
+    float fps;
+    char fpsbuf[24];
+    
+    SDL_Rect rect;
+    SDL_Surface *smsprite, *lgsprite, *smtmp, *lgtmp, *fpstmp;
+    SDL_Event event;
+    
+    const SDL_PixelFormat fmt = *(surface->format);
+    const int center_x = 320;
+    const int center_y = 240;
+    const Uint32 bg = SDL_MapRGB(&fmt, 0, 0, 32); /* dk.blue */
+    const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
+    
+    /* Get the resources we need */
+    smsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "smbullet.png")->data);
+    lgsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
+    
+    /* Make the bullet types */
+    for (i = 0; i < 12; ++i) {
+        sm[i].rad       = tofixed(4, 0);
+        sm[i].flags     = 0;
+        sm[i].gameflags = 0;
+        sm[i].lua       = NULL;
+        sm[i].tl.x      = tofixed(-4,0);
+        sm[i].tl.y      = tofixed(-4,0);
+        sm[i].lr.x      = tofixed(4,0);
+        sm[i].lr.y      = tofixed(4,0);
+        sm[i].drawloc.x = tofixed(-4,0);
+        sm[i].drawloc.y = tofixed(-4,0);
+        
+        lg[i].rad       = tofixed(12, 0);
+        lg[i].flags     = 0;
+        lg[i].gameflags = 0;
+        lg[i].lua       = NULL;
+        lg[i].tl.x      = tofixed(-12,0);
+        lg[i].tl.y      = tofixed(-12,0);
+        lg[i].lr.x      = tofixed(12,0);
+        lg[i].lr.y      = tofixed(12,0);
+        lg[i].drawloc.x = tofixed(-16,0);
+        lg[i].drawloc.y = tofixed(-16,0);
+        
+        /* Now we need to get the images */
+        switch (i) {
+            case 0:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,8,0,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,32,0,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 1:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,16,0,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,64,0,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 2:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,24,0,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,96,0,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 3:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,0,8,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,0,32,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 4:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,8,8,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,32,32,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 5:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,16,8,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,64,32,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 6:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,8,16,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,32,64,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 7:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,16,16,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,64,64,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 8:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,24,16,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,96,64,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 9:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,0,24,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,0,96,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 10:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,8,24,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,32,96,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+            case 11:
+                smtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,8,8,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,16,24,8,8);
+                SDL_BlitSurface(smsprite,&rect, smtmp, NULL);
+                SDL_SetColorKey(smtmp, SDL_SRCCOLORKEY, colorkey);
+                sm[i].img = smtmp;
+                
+                lgtmp = SDL_CreateRGBSurface(SDL_HWSURFACE,32,32,
+                    fmt.BitsPerPixel,fmt.Rmask,fmt.Gmask,fmt.Bmask,fmt.Amask);
+                rectset(rect,64,96,32,32);
+                SDL_BlitSurface(lgsprite,&rect, lgtmp, NULL);
+                SDL_SetColorKey(lgtmp, SDL_SRCCOLORKEY, colorkey);
+                lg[i].img = lgtmp;
+                
+                break;
+        }
+    }
+    
+    while (TRUE) {
+        /* Blank the screen */
+        SDL_FillRect(surface, NULL, bg);
+        
+        /* Process ALL the bullets! */
+        for (i = 0; i < 8192; ++i) {
+            tmp = &bullet_mem[i];
+            if (is_alive(tmp)) {
+                if (process_bullet(tmp)) {
+                    --numbullets;
+                }
+            }
+            /* flooding screen with bullets is bad, hence the limit */
+            else if (bullets_made < 12) {
+                pt.x  = tofixed(rand()%640-320, rand()%65536-32768);
+                pt.y  = tofixed(rand()%480-240, rand()%65536-32768);
+                vel.x = tofixed(rand()%4 - 2,   rand()%65536-32768);
+                vel.y = tofixed(rand()%4 - 2,   rand()%65536-32768);
+                if (rand()%2) {
+                    if (make_bullet(pt, vel, &sm[rand()%12]) != NULL) {
+                        ++numbullets;
+                        ++bullets_made;
+                    }
+                }
+                else {
+                    if (make_bullet(pt, vel, &lg[rand()%12]) != NULL) {
+                        ++numbullets;
+                        ++bullets_made;
+                    }
+                }
+            }
+            
+            draw_bullet(tmp, surface, center_x, center_y);
+        }
+        
+        /* Update time information */
+        bullets_made = 0;
+        ++frame;
+        newtime = SDL_GetTicks();
+        time += newtime - lasttime;
+        lasttime = newtime;
+        
+        /* Display FPS */
+        fps = frame / (time/1000.0F); /* time is in milliseconds */
+        sprintf(fpsbuf, "%d @ %.2f fps", numbullets, fps);
+        fpstmp = TTF_RenderText_Solid(font, fpsbuf, off);
+        SDL_BlitSurface(fpstmp, NULL, surface, NULL);
+        
+        SDL_Flip(surface);
+        
+        /* Should we quit? */
+        if (SDL_PollEvent(&event)) {
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    break;
+                }
+            }
+        }
+    }
+    reset_bullets();
+}
+
+void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
+{
+    bullet *tmp;
+    
+    bullet_type miss[2];
+    bullet_type hit[2];
+    
+    rect_point vel, pt;
+    
+    int i, j, mouse_x, mouse_y;
+    
+    SDL_Rect rect;
+    SDL_Surface *smsprite, *lgsprite, *stmp;
+    SDL_Event event;
+    
+    const SDL_PixelFormat fmt = *(surface->format);
+    const int center_x = 320;
+    const int center_y = 240;
+    const Uint32 bg = SDL_MapRGB(&fmt, 0, 0, 32); /* dk.blue */
+    const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
+    
+    /* Get the resources we need */
+    smsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "smbullet.png")->data);
+    lgsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
+    
+    /* Make the bullet types */
+    
+    miss[0].rad       = tofixed(4, 0);
+    miss[0].flags     = 0;
+    miss[0].gameflags = 0;
+    miss[0].lua       = NULL;
+    miss[0].tl.x      = tofixed(-4,0);
+    miss[0].tl.y      = tofixed(-4,0);
+    miss[0].lr.x      = tofixed(4,0);
+    miss[0].lr.y      = tofixed(4,0);
+    miss[0].drawloc.x = tofixed(-4,0);
+    miss[0].drawloc.y = tofixed(-4,0);
+    
+    hit[0].rad       = tofixed(4, 0);
+    hit[0].flags     = 0;
+    hit[0].gameflags = 0;
+    hit[0].lua       = NULL;
+    hit[0].tl.x      = tofixed(-4,0);
+    hit[0].tl.y      = tofixed(-4,0);
+    hit[0].lr.x      = tofixed(4,0);
+    hit[0].lr.y      = tofixed(4,0);
+    hit[0].drawloc.x = tofixed(-4,0);
+    hit[0].drawloc.y = tofixed(-4,0);
+    
+    miss[1].rad       = tofixed(12, 0);
+    miss[1].flags     = 0;
+    miss[1].gameflags = 1; /* we're cheating here, this means it's big */
+    miss[1].lua       = NULL;
+    miss[1].tl.x      = tofixed(-12,0);
+    miss[1].tl.y      = tofixed(-12,0);
+    miss[1].lr.x      = tofixed(12,0);
+    miss[1].lr.y      = tofixed(12,0);
+    miss[1].drawloc.x = tofixed(-16,0);
+    miss[1].drawloc.y = tofixed(-16,0);
+    
+    hit[1].rad       = tofixed(12, 0);
+    hit[1].flags     = 0;
+    hit[1].gameflags = 1;
+    hit[1].lua       = NULL;
+    hit[1].tl.x      = tofixed(-12,0);
+    hit[1].tl.y      = tofixed(-12,0);
+    hit[1].lr.x      = tofixed(12,0);
+    hit[1].lr.y      = tofixed(12,0);
+    hit[1].drawloc.x = tofixed(-16,0);
+    hit[1].drawloc.y = tofixed(-16,0);
+        
+    /* Now we need to get the images */
+    
+    stmp = SDL_CreateRGBSurface(SDL_HWSURFACE, 8, 8, fmt.BitsPerPixel,
+                        fmt.Rmask, fmt.Gmask, fmt.Bmask, fmt.Amask);
+    rectset(rect,24,24,8,8);
+    SDL_BlitSurface(smsprite,&rect, stmp, NULL);
+    SDL_SetColorKey(stmp, SDL_SRCCOLORKEY, colorkey);
+    miss[0].img = stmp;
+    
+    stmp = SDL_CreateRGBSurface(SDL_HWSURFACE, 32, 32, fmt.BitsPerPixel,
+                        fmt.Rmask, fmt.Gmask, fmt.Bmask, fmt.Amask);
+    rectset(rect,0,0,32,32);
+    SDL_BlitSurface(lgsprite,&rect, stmp, NULL);
+    SDL_SetColorKey(stmp, SDL_SRCCOLORKEY, colorkey);
+    miss[1].img = stmp;
+    
+    stmp = SDL_CreateRGBSurface(SDL_HWSURFACE, 8, 8, fmt.BitsPerPixel,
+                        fmt.Rmask, fmt.Gmask, fmt.Bmask, fmt.Amask);
+    rectset(rect,16,0,8,8);
+    SDL_BlitSurface(smsprite,&rect, stmp, NULL);
+    SDL_SetColorKey(stmp, SDL_SRCCOLORKEY, colorkey);
+    hit[0].img = stmp;
+    
+    stmp = SDL_CreateRGBSurface(SDL_HWSURFACE, 32, 32, fmt.BitsPerPixel,
+                        fmt.Rmask, fmt.Gmask, fmt.Bmask, fmt.Amask);
+    rectset(rect,64,64,32,32);
+    SDL_BlitSurface(lgsprite,&rect, stmp, NULL);
+    SDL_SetColorKey(stmp, SDL_SRCCOLORKEY, colorkey);
+    hit[1].img = stmp;
+    
+    /* 
+     * For this test, we're going to create a matrix of stationary bullets
+     * makes it easier to test all the hitboxes
+     */
+    for (i = 0; i < 12; ++i) {
+        for (j = 0; j < 16; ++j) {
+            pt.x = fixmul(fixdiv(tofixed(640,0),tofixed(17,0)),tofixed(j+1,0));
+            pt.x -= tofixed(center_x,0);
+            pt.y = fixmul(fixdiv(tofixed(480,0),tofixed(13,0)),tofixed(i+1,0));
+            pt.y -= tofixed(center_y,0);
+            vel.x = fixzero;
+            vel.y = fixzero;
+            
+            if ((i+j) % 2 == 1) {
+                make_bullet(pt, vel, &miss[0]);
+            }
+            else {
+                make_bullet(pt, vel, &miss[1]);
+            }
+        }
+    }
+    
+    while (TRUE) {
+        /* Blank the screen */
+        SDL_FillRect(surface, NULL, bg);
+        
+        /* Update mouse */
+        SDL_GetMouseState(&mouse_x, &mouse_y);
+        /* need this relative to the center */
+        mouse_x -= center_x;
+        mouse_y -= center_y;
+        pt.x = tofixed(mouse_x, 0);
+        pt.y = tofixed(mouse_y, 0);
+        
+        /* We may as well process all the bullets, most of them are gone */
+        for (i = 0; i < 8192; ++i) {
+            tmp = &bullet_mem[i];
+            if (is_alive(tmp)) {
+                process_bullet(tmp);
+                if(collide_bullet(tmp, pt, fixzero)) {
+                    if(tmp->gameflags) {
+                        tmp->img = hit[1].img;
+                    }
+                    else {
+                        tmp->img = hit[0].img;
+                    }
+                }
+                else {
+                    if(tmp->gameflags) {
+                        tmp->img = miss[1].img;
+                    }
+                    else {
+                        tmp->img = miss[0].img;
+                    }
+                }
+            }
+            
+            draw_bullet(tmp, surface, center_x, center_y);
+        }
+        
+        SDL_Flip(surface);
+        
+        /* Should we quit? */
+        if (SDL_PollEvent(&event)) {
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    break;
+                }
+            }
+        }
+    }
+    reset_bullets();
 }
 
 #endif /* def SYSTEM_TEST */

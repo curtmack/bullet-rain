@@ -15,22 +15,27 @@ LINK = gcc
 # LINK flags
 LFLAGS = -Wall `sdl-config --cflags`
 # Library switches
-LIBS = -larchive -lpthread `sdl-config --libs` -lSDL_ttf -lSDL_image
+LIBS = -larchive `sdl-config --libs` -lSDL_ttf -lSDL_image
 # Executable extension
-EXE = .exe
+EXE = 
 # File deleting program, preferably one that ignores missing files
 #   (via commandline switch if necessary)
 RM = rm -f
 
 # These macros speed up typing, you shouldn't need to change them
 OBJS = src/main.o src/debug.o src/resource.o src/geometry.o src/fixed.o \
-       src/menu.o src/init.o
+       src/menu.o src/init.o src/collmath.o src/bullet.o
 # Debugging objects, you'll see why we need these separately
 DOBJS = src/main.do src/debug.do src/resource.do src/geometry.do src/fixed.do \
-		src/menu.do src/init.do
+		src/menu.do src/init.do src/collmath.do src/bullet.do
+# Systest objects
+TOBJS = src/systest.to src/debug.to src/resource.to src/geometry.to \
+		src/fixed.to src/menu.to src/init.to src/collmath.to src/bullet.to
 
 # Make definitions follow
 # Default target
+
+systest: bullet-rain-systest$(EXE)
 
 debug: bullet-rain-debug$(EXE)
 
@@ -40,17 +45,25 @@ debug: bullet-rain-debug$(EXE)
 bullet-rain-debug$(EXE): $(DOBJS)
 	$(LINK) $(LFLAGS) $(DOBJS) $(LIBS) -d -o bullet-rain-debug$(EXE)
 
+bullet-rain-systest$(EXE): $(TOBJS)
+	$(LINK) $(LFLAGS) $(TOBJS) $(LIBS) -d -o bullet-rain-systest$(EXE)
+
 # Object files
 .c.o:
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -USYSTEM_TEST -UDEBUG -c $< -o $@
 
-# Here we do some naught tricks to get object files with debugging flags
+# Here we do some naughty tricks to get object files with debugging flags
 %.do: %.c
-	$(CC) $(CFLAGS) -g -c $< -o $@
+	$(CC) $(CFLAGS) -USYSTEM_TEST -DDEBUG -g -c $< -o $@
+
+%.to: %.c
+	$(CC) $(CFLAGS) -DSYSTEM_TEST -DDEBUG -g -c $< -o $@
 
 # Clean target
 clean:
 	- $(RM) $(OBJS)
 	- $(RM) $(DOBJS)
+	- $(RM) $(TOBJS)
+	- $(RM) bullet-rain-systest$(EXE)
 	- $(RM) bullet-rain-debug$(EXE)
 #	- $(RM) bullet-rain$(EXE)

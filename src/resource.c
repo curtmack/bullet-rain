@@ -135,7 +135,7 @@ void reset_progress(void)
  */
 void _doctor_resource(resource *res)
 {
-    SDL_Surface *img;
+    SDL_Surface *img, *opt;
     SDL_RWops   *rwop;
     
     /* We assume the calling function has already locked the resource */
@@ -150,8 +150,11 @@ void _doctor_resource(resource *res)
             img  = IMG_LoadPNG_RW(rwop);
             verbose("Cleaning up");
             SDL_FreeRW(rwop);
+            /* Now we need to optimize the surface */
+            opt = SDL_DisplayFormat(img);
+            SDL_FreeSurface(img);
             free(res->data);
-            res->data = (void*)img;
+            res->data = (void*)opt;
             break;
         default:
             break;
