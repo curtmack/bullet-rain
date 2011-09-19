@@ -26,8 +26,8 @@
  */
 /* #define SIXTYFOUR */
 
-/* Include debug bindings */
-#define DEBUG
+/* Deprecated: DEBUG - Now set by the makefile */
+
 /* Verbose output */
 /* #define VERBOSE_DEBUG */
 
@@ -43,9 +43,9 @@
 /* #define INCLUDE_SDL_PREFIX */
 
 /* Version string */
-#define ENGINE_VERSION "0.0.0.3"
+#define ENGINE_VERSION "0.0.1"
 /* padded with nulls to 16 chars */
-#define ENGINE_VERSION_16 "0.0.0.3\0\0\0\0\0\0\0\0\0"
+#define ENGINE_VERSION_16 "0.0.1\0\0\0\0\0\0\0\0\0\0\0\0"
 
 /* 
  * Some compilers don't provide these for some reason?
