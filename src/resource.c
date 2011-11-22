@@ -172,8 +172,8 @@ inline arclist *_get_arc_from_chain(sid_t id, char *arcname)
     for(temparc = arc_head; temparc != NULL && temparc->id != id;
         temparc = temparc->next);
     /* Check the strings too, because I'm paranoid */
-    for(; temparc != NULL && (r = strcmp(temparc->name, arcname)) < 0;
-        temparc = temparc->next);
+    /* for(; temparc != NULL && (r = strcmp(temparc->name, arcname)) < 0;
+        temparc = temparc->next); */
     /* Did we miss it? */
     if (r > 0) temparc = NULL;
     r = SDL_mutexV(arc_lock);
@@ -583,7 +583,7 @@ resource *get_res(char *arcname, char *resname)
          tempres != NULL && tempres->id < reshash; tempres = tempres->next);
     
     /* Did we reach the end of the list? */
-    if (!tempres) {
+    if (tempres == NULL) {
         r = SDL_mutexV(temparc->_lock);
         check_mutex(r);
         warn2(FALSE, "Arclist didn't have the requested resource:", resname);
@@ -608,7 +608,7 @@ resource *get_res(char *arcname, char *resname)
     check_mutex(r);
     
     /* Check again for NULL, since we may have set NULL since then */
-    if (!tempres) {
+    if (tempres == NULL) {
         warn2(FALSE, "Arclist didn't have the requested resource:", resname);
         return NULL;
     }

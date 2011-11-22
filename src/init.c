@@ -11,8 +11,12 @@
  * Contains code for initializing and stopping all subsystems
  */
 
+#include "debug.h"
 #include "init.h"
+#include "input.h"
+#include "player.h"
 #include "resource.h"
+#include "timer.h"
 #include "bullet.h"
 
 #ifdef INCLUDE_SDL_PREFIX
@@ -27,22 +31,30 @@
 
 int init_all(void)
 {
-    init_resources();
+    init_debug();
     SDL_Init(SDL_INIT_EVERYTHING);
     IMG_Init(IMG_INIT_PNG);
     TTF_Init();
+    init_timer();
+    init_resources();
+    init_inputs();
     init_bullets();
+    init_player();
+    
+    atexit(stop_all);
     
     return 0;
 }
 
-int stop_all(void)
+void stop_all(void)
 {
+    stop_player();
     stop_bullets();
+    stop_inputs();
+    stop_resources();
+    stop_timer();
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
-    stop_resources();
-    
-    return 0;
+    stop_debug();
 }

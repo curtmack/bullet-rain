@@ -15,7 +15,7 @@
 
 #define INIT_H
 
-extern int init_all(void);
-extern int stop_all(void);
+extern int  init_all(void);
+extern void stop_all(void);
 
 #endif /* !def INIT_H */

@@ -17,15 +17,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef INCLUDE_SDL_PREFIX
+#include "SDL/SDL.h"
+#include "SDL/SDL_thread.h"
+#else
+#include "SDL.h"
+#include "SDL_thread.h"
+#endif
+
+SDL_mutex *debug_output_lock;
+
 #ifdef DEBUG
 
 void _debug (char *msg1, char *msg2)
 {
+    SDL_mutexP(debug_output_lock);
     printf("  --> DEBUG: %s %s\n", msg1, msg2);
+    SDL_mutexV(debug_output_lock);
     fflush(stdout);
 }
-void _debugn (char *msg1, int num) {
+void _debugn (char *msg1, int num)
+{    
+    SDL_mutexP(debug_output_lock);
     printf("  --> DEBUG: %s %d\n", msg1, num);
+    SDL_mutexV(debug_output_lock);
     fflush(stdout);
 }
 
@@ -35,12 +50,16 @@ void _debugn (char *msg1, int num) {
 
 void _warn (char *msg1, char *msg2, char *file, int line)
 {
+    SDL_mutexP(debug_output_lock);
     printf("  --> WARNING at %s line %d: %s %s\n", file, line, msg1, msg2);
+    SDL_mutexV(debug_output_lock);
     fflush(stdout);
 }
 void _warnn (char *msg1, int num, char *file, int line)
 {
+    SDL_mutexP(debug_output_lock);
     printf("  --> WARNING at %s line %d: %s %d\n", file, line, msg1, num);
+    SDL_mutexV(debug_output_lock);
     fflush(stdout);
 }
 
@@ -51,20 +70,35 @@ void _memdump(void)
 
 void _panic (char *msg1, char *msg2, char *file, int line)
 {
+    SDL_mutexP(debug_output_lock);
     printf("  --> PANIC at %s line %d: %s %s\n  Shutting down!\n",
                           file,  line,msg1,msg2);
+    SDL_mutexV(debug_output_lock);
     fflush(stdout);
 
     _memdump();
-    exit(1);
+    abort();
 }
 
 void _panicn (char *msg1, int num, char *file, int line)
 {
+    SDL_mutexP(debug_output_lock);
     printf("  --> PANIC at %s line %d: %s %d\n  Shutting down!\n",
                           file,  line,msg1,num);
     fflush(stdout);
+    SDL_mutexV(debug_output_lock);
 
     _memdump();
-    exit(1);
+    abort();
+}
+
+int init_debug()
+{
+    debug_output_lock = SDL_CreateMutex();
+    
+    return 0;
+}
+void stop_debug()
+{
+    SDL_DestroyMutex(debug_output_lock);
 }

@@ -124,4 +124,8 @@ extern void _warnn (char *msg1, int num, char *file, int line);
 extern void _panic (char *msg1, char *msg2, char *file, int line);
 extern void _panicn (char *msg1, int num, char *file, int line);
 
+/* And for some reason stdout requires a lock, so we need these: */
+extern int init_debug();
+extern void stop_debug();
+
 #endif /* !def DEBUG_H */

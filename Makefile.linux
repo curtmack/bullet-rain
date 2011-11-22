@@ -24,13 +24,14 @@ RM = rm -f
 
 # These macros speed up typing, you shouldn't need to change them
 OBJS = src/main.o src/debug.o src/resource.o src/geometry.o src/fixed.o \
-       src/menu.o src/init.o src/collmath.o src/bullet.o
+       src/menu.o src/init.o src/collmath.o src/bullet.o src/timer.o
 # Debugging objects, you'll see why we need these separately
 DOBJS = src/main.do src/debug.do src/resource.do src/geometry.do src/fixed.do \
-		src/menu.do src/init.do src/collmath.do src/bullet.do
+		src/menu.do src/init.do src/collmath.do src/bullet.do src/timer.do
 # Systest objects
 TOBJS = src/systest.to src/debug.to src/resource.to src/geometry.to \
-		src/fixed.to src/menu.to src/init.to src/collmath.to src/bullet.to
+		src/fixed.to src/menu.to src/init.to src/collmath.to src/bullet.to \
+		src/timer.to
 
 # Make definitions follow
 # Default target

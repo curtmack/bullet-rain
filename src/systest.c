@@ -18,12 +18,16 @@
 #ifdef SYSTEM_TEST
 
 #include "bullet.h"
+#include "coreship.h"
 #include "debug.h"
 #include "fixed.h"
 #include "geometry.h"
 #include "init.h"
+#include "input.h"
 #include "menu.h"
+#include "player.h"
 #include "resource.h"
+#include "timer.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -46,26 +50,35 @@ void fixed_test(SDL_Surface *surface, TTF_Font *font);
 void geom_test(SDL_Surface *surface, TTF_Font *font);
 void hash_test(SDL_Surface *surface, TTF_Font *font);
 void res_test(SDL_Surface *surface, TTF_Font *font);
+void timer_test(SDL_Surface *surface, TTF_Font *font);
+void input_test(SDL_Surface *surface, TTF_Font *font);
 void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font);
 void bull_test_collision(SDL_Surface *surface, TTF_Font *font);
+void player_test(SDL_Surface *surface, TTF_Font *font);
 
-#define TEST_MENU_SIZE 7
+#define TEST_MENU_SIZE 10
 
 #define TEST_FIXED     0
 #define TEST_GEOM      1
 #define TEST_HASH      2
 #define TEST_RES       3
-#define TEST_FAKEBULL  4
-#define TEST_COLLISION 5
-#define TEST_QUIT      6
+#define TEST_TIMER     4
+#define TEST_INPUT     5
+#define TEST_FAKEBULL  6
+#define TEST_COLLISION 7
+#define TEST_PLAYER    8
+#define TEST_QUIT      9
 
 const char menu[TEST_MENU_SIZE][32] = {
     "Fixed-point arithmetic test",
     "Trigonometry test",
     "String hashing test",
     "Resource loader test",
+    "60 hz timer test",
+    "Input test",
     "Bullet test - fake pipeline",
     "Bullet test - collision",
+    "Player test",
     "Quit the system test"
 };
     
@@ -78,33 +91,23 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
 {
     brmenu *brm;
     
-    int i, menu_x, menu_y, menu_width, menu_height;
+    int i, prev, next, menu_x, menu_y, menu_width, menu_height;
     
     char versionstring[64];
     
     SDL_Surface *back;
     SDL_Surface *logoimg;
     SDL_Surface *version;
-    SDL_Surface *offs[7];
-    SDL_Surface *ons [7];
+    SDL_Surface *offs[TEST_MENU_SIZE];
+    SDL_Surface *ons [TEST_MENU_SIZE];
     
     SDL_Rect rect, offsrc, offdst, onsrc, ondst;
     const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
     
-    offs[0] = TTF_RenderText_Solid(font, menu[0], off);
-    ons [0] = TTF_RenderText_Solid(font, menu[0], on );
-    offs[1] = TTF_RenderText_Solid(font, menu[1], off);
-    ons [1] = TTF_RenderText_Solid(font, menu[1], on );
-    offs[2] = TTF_RenderText_Solid(font, menu[2], off);
-    ons [2] = TTF_RenderText_Solid(font, menu[2], on );
-    offs[3] = TTF_RenderText_Solid(font, menu[3], off);
-    ons [3] = TTF_RenderText_Solid(font, menu[3], on );
-    offs[4] = TTF_RenderText_Solid(font, menu[4], off);
-    ons [4] = TTF_RenderText_Solid(font, menu[4], on );
-    offs[5] = TTF_RenderText_Solid(font, menu[5], off);
-    ons [5] = TTF_RenderText_Solid(font, menu[5], on );
-    offs[6] = TTF_RenderText_Solid(font, menu[6], off);
-    ons [6] = TTF_RenderText_Solid(font, menu[6], on );
+    for (i = 0; i < TEST_MENU_SIZE; ++i) {
+        offs[i] = TTF_RenderText_Solid(font, menu[i], off);
+        ons [i] = TTF_RenderText_Solid(font, menu[i], on );
+    }
     
     /* 
      * This just makes an empty surface the same size and format as our screen
@@ -156,60 +159,18 @@ brmenu *construct_menu(SDL_Surface *surface, TTF_Font *font, resource *logo)
     brm = create_menu(surface, back, offsrc, offdst, NULL, NULL);
               
     /* Add all the entries */
-    rectset(offsrc, 0, 0, offs[0]->w, offs[0]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[0]->w, ons[0]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_FIXED, TEST_QUIT, TEST_GEOM, -1, -1,
-                   offs[0], offsrc, offdst, ons[0], onsrc, ondst);
-    menu_y += offs[0]->h;
-
-    rectset(offsrc, 0, 0, offs[1]->w, offs[1]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[1]->w, ons[1]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_GEOM, TEST_FIXED, TEST_HASH, -1, -1,
-                   offs[1], offsrc, offdst, ons[1], onsrc, ondst);
-    menu_y += offs[1]->h;
-    
-    rectset(offsrc, 0, 0, offs[2]->w, offs[2]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[2]->w, ons[2]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_HASH, TEST_GEOM, TEST_RES, -1, -1,
-                   offs[2], offsrc, offdst, ons[2], onsrc, ondst);
-    menu_y += offs[2]->h;
-    
-    rectset(offsrc, 0, 0, offs[3]->w, offs[3]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[3]->w, ons[3]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_RES, TEST_HASH, TEST_FAKEBULL, -1, -1,
-                   offs[3], offsrc, offdst, ons[3], onsrc, ondst);
-    menu_y += offs[3]->h;
-    
-    rectset(offsrc, 0, 0, offs[4]->w, offs[4]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[4]->w, ons[4]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_FAKEBULL, TEST_RES, TEST_COLLISION, -1, -1,
-                   offs[4], offsrc, offdst, ons[4], onsrc, ondst);
-    menu_y += offs[4]->h;
-    
-    rectset(offsrc, 0, 0, offs[5]->w, offs[5]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[5]->w, ons[5]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_COLLISION, TEST_FAKEBULL, TEST_QUIT, -1, -1,
-                   offs[5], offsrc, offdst, ons[5], onsrc, ondst);
-    menu_y += offs[5]->h;
-    
-    rectset(offsrc, 0, 0, offs[6]->w, offs[6]->h);
-    rectset(offdst, menu_x, menu_y, 0, 0 );
-    rectset(onsrc, 0, 0, ons[6]->w, ons[6]->h );
-    rectset(ondst, menu_x, menu_y, 0, 0 );
-    menu_add_entry(brm, TEST_QUIT, TEST_COLLISION, TEST_FIXED, -1, -1,
-                   offs[6], offsrc, offdst, ons[6], onsrc, ondst);
+    for (i = 0; i < TEST_MENU_SIZE; ++i) {
+        prev = (i > 0 ? i-1 : TEST_MENU_SIZE - 1);
+        next = (i < TEST_MENU_SIZE - 1 ? i+1 : 0);
+        
+        rectset(offsrc, 0, 0, offs[i]->w, offs[i]->h);
+        rectset(offdst, menu_x, menu_y, 0, 0 );
+        rectset(onsrc, 0, 0, ons[i]->w, ons[i]->h );
+        rectset(ondst, menu_x, menu_y, 0, 0 );
+        menu_add_entry(brm, i, prev, next, -1, -1, offs[i], offsrc, offdst,
+                       ons[i], onsrc, ondst);
+        menu_y += offs[i]->h;
+    }
     
     /* Link all the entries together */
     menu_link_entries(brm);
@@ -257,7 +218,6 @@ int main(int argc, char *argv[])
     TTF_Font *font = NULL;
 
     srand((int) time(NULL));
-    printf("%x %x\n", INT_MIN, INT_MAX);
     
     panic(!init_all(), "Error initializing engine subsystems");
     
@@ -298,11 +258,20 @@ int main(int argc, char *argv[])
             case TEST_RES:
                 res_test(screen, font);
                 break;
+            case TEST_TIMER:
+                timer_test(screen, font);
+                break;
+            case TEST_INPUT:
+                input_test(screen, font);
+                break;
             case TEST_FAKEBULL:
                 bull_test_fake_proc(screen, font);
                 break;
             case TEST_COLLISION:
                 bull_test_collision(screen, font);
+                break;
+            case TEST_PLAYER:
+                player_test(screen, font);
                 break;
             case TEST_QUIT:
                 finished = TRUE;
@@ -315,8 +284,6 @@ int main(int argc, char *argv[])
     destroy_menu(brm);
     TTF_CloseFont(font);
     SDL_FreeSurface(screen);
-    
-    panic(!stop_all(), "Error stopping engine subsystems!");
     
     return 0;
 }
@@ -1033,6 +1000,244 @@ void res_test(SDL_Surface *surface, TTF_Font *font)
     puts("Leaving archive in memory.");
 }
 
+void timer_test(SDL_Surface *surface, TTF_Font *font)
+{
+    Uint32 start_clock = clock_60hz();
+    Uint32 start_ticks = SDL_GetTicks();
+    Sint32 clock, ticks;
+    float realhz;
+    char buffer[64];
+    
+    SDL_Surface *tmp;
+    SDL_Event event;
+    SDL_Rect rect;
+
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
+    
+    while (TRUE) {
+        /* Update calculations */
+        clock = clock_60hz()   - start_clock;
+        ticks = SDL_GetTicks() - start_ticks;
+        
+        realhz = (ticks==0 ? 60.0F : clock / (ticks/1000.0F)); /* ms to sec */
+        
+        /* Draw background */
+        SDL_FillRect(surface, NULL, bg);
+        
+        /* Draw in text */
+        sprintf(buffer, "%u clock ticks in %u ms", clock, ticks);
+        tmp = TTF_RenderText_Solid(font, buffer, off);
+        rectset(rect, 0, 0, 0, 0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+        
+        sprintf(buffer, "% g hz error", realhz - 60.0);
+        if (fabs(realhz - 60.0) <= 0.2) {
+            tmp = TTF_RenderText_Solid(font, buffer, off);
+        }
+        else {
+            tmp = TTF_RenderText_Solid(font, buffer, on);
+        }
+        rectset(rect, 0, tmp->h, 0, 0);
+        SDL_BlitSurface(tmp, NULL, surface, &rect);
+
+        SDL_Flip(surface);
+        
+        if (SDL_PollEvent(&event)) {
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void input_test(SDL_Surface *surface, TTF_Font *font)
+{
+    fixed_t x = fixzero, y = fixzero;
+    
+    int temp_x, temp_y, i;
+    
+    SDL_Event event;
+    SDL_Surface *lgsprite, *oursprite, *text;
+    SDL_PixelFormat *fmt;
+    SDL_Rect rect;
+    
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
+    
+#define INPUT_TEST_UP    0
+#define INPUT_TEST_DOWN  1
+#define INPUT_TEST_LEFT  2
+#define INPUT_TEST_RIGHT 3
+
+#define INPUT_TEST_MOVESPEED tofixed(0,8192)
+    
+    /* Get the sprite */
+    lgsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
+    fmt = lgsprite->format;
+    /* copy over the one we actually want */
+    rectset(rect, 32, 0, 32, 32);
+    oursprite = SDL_CreateRGBSurface(SDL_SWSURFACE | SDL_SRCCOLORKEY, 32, 32,
+                                     fmt->BitsPerPixel, fmt->Rmask, fmt->Gmask,
+                                     fmt->Bmask, fmt->Amask);
+    SDL_BlitSurface(lgsprite, &rect, oursprite, NULL);
+    /* set the color key */
+    SDL_SetColorKey(oursprite, SDL_SRCCOLORKEY, SDL_MapRGB(fmt, 255, 0, 255));
+    
+    /* Get keys from user */
+    SDL_FillRect(surface, NULL, bg);
+    text = TTF_RenderText_Solid(font, "Press key for up", off);
+    temp_x = (surface->w - text->w)/2;
+    temp_y = (surface->h - text->h)/2;
+    rectset(rect,temp_x,temp_y,0,0);
+    SDL_BlitSurface(text, NULL, surface, &rect);
+    SDL_Flip(surface);
+    while (TRUE) {
+        if (SDL_WaitEvent(&event) && event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                /* Abandon thread! */
+                SDL_FreeSurface(text);
+                SDL_FreeSurface(oursprite);
+                return;
+            }
+            else {
+                /* Register and bind the input */
+                input_register_boolean(INPUT_TEST_UP);
+                input_config_key(INPUT_TEST_UP, event.key.keysym.sym);
+                /* Get out of the loop */
+                break;
+            }
+        }
+    }
+    SDL_FreeSurface(text);
+    
+    SDL_FillRect(surface, NULL, bg);
+    text = TTF_RenderText_Solid(font, "Press key for down", off);
+    temp_x = (surface->w - text->w)/2;
+    temp_y = (surface->h - text->h)/2;
+    rectset(rect,temp_x,temp_y,0,0);
+    SDL_BlitSurface(text, NULL, surface, &rect);
+    SDL_Flip(surface);
+    while (TRUE) {
+        if (SDL_WaitEvent(&event) && event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                /* Abandon thread! */
+                SDL_FreeSurface(text);
+                SDL_FreeSurface(oursprite);
+                return;
+            }
+            else {
+                /* Register and bind the input */
+                input_register_boolean(INPUT_TEST_DOWN);
+                input_config_key(INPUT_TEST_DOWN, event.key.keysym.sym);
+                /* Get out of the loop */
+                break;
+            }
+        }
+    }
+    SDL_FreeSurface(text);
+    
+    SDL_FillRect(surface, NULL, bg);
+    text = TTF_RenderText_Solid(font, "Press key for left", off);
+    temp_x = (surface->w - text->w)/2;
+    temp_y = (surface->h - text->h)/2;
+    rectset(rect,temp_x,temp_y,0,0);
+    SDL_BlitSurface(text, NULL, surface, &rect);
+    SDL_Flip(surface);
+    while (TRUE) {
+        if (SDL_WaitEvent(&event) && event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                /* Abandon thread! */
+                SDL_FreeSurface(text);
+                SDL_FreeSurface(oursprite);
+                return;
+            }
+            else {
+                /* Register and bind the input */
+                input_register_boolean(INPUT_TEST_LEFT);
+                input_config_key(INPUT_TEST_LEFT, event.key.keysym.sym);
+                /* Get out of the loop */
+                break;
+            }
+        }
+    }
+    SDL_FreeSurface(text);
+    
+    SDL_FillRect(surface, NULL, bg);
+    text = TTF_RenderText_Solid(font, "Press key for right", off);
+    temp_x = (surface->w - text->w)/2;
+    temp_y = (surface->h - text->h)/2;
+    rectset(rect,temp_x,temp_y,0,0);
+    SDL_BlitSurface(text, NULL, surface, &rect);
+    SDL_Flip(surface);
+    while (TRUE) {
+        if (SDL_WaitEvent(&event) && event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                /* Abandon thread! */
+                SDL_FreeSurface(text);
+                SDL_FreeSurface(oursprite);
+                return;
+            }
+            else {
+                /* Register and bind the input */
+                input_register_boolean(INPUT_TEST_RIGHT);
+                input_config_key(INPUT_TEST_RIGHT, event.key.keysym.sym);
+                /* Get out of the loop */
+                break;
+            }
+        }
+    }
+    SDL_FreeSurface(text);
+    
+    while (TRUE) {
+        /* Do we have events? */
+        while (SDL_PollEvent(&event)) {
+            /* Run through the input system */
+            if (!update_input(event)) {
+                /* Check for escape */
+                if (event.type == SDL_KEYDOWN && 
+                    event.key.keysym.sym == SDLK_ESCAPE) {
+    
+                    /* Free our sprite */
+                    SDL_FreeSurface(oursprite);
+                    
+                    /* Unregister inputs */
+                    for (i = 0; i < 4; ++i) {
+                        unregister_input(i);
+                    }
+                    
+                    /* Exit the test */
+                    return;
+                }
+            }
+        }
+        
+        /* Move the sprite around */
+        if (input_value(INPUT_TEST_UP)) {
+            y -= INPUT_TEST_MOVESPEED;
+        }
+        if (input_value(INPUT_TEST_DOWN)) {
+            y += INPUT_TEST_MOVESPEED;
+        }
+        if (input_value(INPUT_TEST_LEFT)) {
+            x -= INPUT_TEST_MOVESPEED;
+        }
+        if (input_value(INPUT_TEST_RIGHT)) {
+            x += INPUT_TEST_MOVESPEED;
+        }
+        
+        /* Draw the sprite */
+        SDL_FillRect(surface, NULL, bg);
+        rect.x = intpart(x) + 320;
+        rect.y = intpart(y) + 240;
+        SDL_BlitSurface(oursprite, NULL, surface, &rect);
+        SDL_Flip(surface);
+        
+        /* Keep looping */
+    }
+    
+    /* We never get out of here */
+}
 
 void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
 {
@@ -1044,7 +1249,8 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
     rect_point vel, pt;
     
     int i, bullets_made = 0, numbullets = 0;
-    Uint32 frame = 0, time = 0, lasttime = SDL_GetTicks(), newtime;
+    Uint32 lasttime = SDL_GetTicks(), newtime, frametotal = 0;
+    Uint32 frames[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
     float fps;
     char fpsbuf[24];
     
@@ -1320,18 +1526,33 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
         
         /* Update time information */
         bullets_made = 0;
-        ++frame;
+        
         newtime = SDL_GetTicks();
-        time += newtime - lasttime;
+        
+        frametotal += newtime - lasttime;
+        frametotal -= frames[0];
+        
+        for (i = 0; i < 11; ++i) {
+            frames[i] = frames[i+1];
+        }
+        
+        frames[11] = newtime - lasttime;
         lasttime = newtime;
         
         /* Display FPS */
-        fps = frame / (time/1000.0F); /* time is in milliseconds */
+        if (frametotal == 0) {
+            fps = 999.9F; /* arbitrary number */
+        }
+        else {
+            fps = 12.0F / (frametotal/1000.0F); /* time is in milliseconds */
+        }
         sprintf(fpsbuf, "%d @ %.2f fps", numbullets, fps);
         fpstmp = TTF_RenderText_Solid(font, fpsbuf, off);
         SDL_BlitSurface(fpstmp, NULL, surface, NULL);
         
         SDL_Flip(surface);
+        
+        SDL_Delay(1);
         
         /* Should we quit? */
         if (SDL_PollEvent(&event)) {
@@ -1518,6 +1739,73 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
         }
     }
     reset_bullets();
+}
+
+void player_test(SDL_Surface *surface, TTF_Font *font)
+{
+    player ship;
+    SDL_Event event;
+    Uint32 last_clock_tick;
+    pbullet *tmp;
+    int i;
+    
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
+    
+    ship = make_coreship();
+    setup_coreship(0);
+    ship.center.x = fixzero;
+    ship.center.y = fixzero;
+    
+    last_clock_tick = clock_60hz();
+    
+    while (TRUE) {
+        /* Check for events */
+        if (SDL_PollEvent(&event)) {
+            /* Give escape priority */
+            if (event.type == SDL_KEYDOWN &&
+                event.key.keysym.sym == SDLK_ESCAPE) {
+                break;
+            }
+            else {
+                /* Run through input system */
+                update_input(event);
+            }
+        }
+        
+        /* Blank out the screen */
+        SDL_FillRect(surface, NULL, bg);
+        
+        /* Update all the pbullets */
+        for (i = 0; i < 1024; ++i) {
+            tmp = &pbullet_mem[i];
+            if (pis_alive(tmp)) {
+                update_pbullet(tmp);
+            }
+        }
+        
+        /* Update the ship */
+        update_coreship(0, &ship);
+        
+        /* Draw all the pbullets (including new ones) */
+        for (i = 0; i < 1024; ++i) {
+            tmp = &pbullet_mem[i];
+            if (pis_alive(tmp)) {
+                draw_pbullet(*tmp, surface, 320, 240);
+            }
+        }
+        
+        /* Draw the ship */
+        draw_player(ship, surface, 320, 240);
+        
+        /* Flip the screen */
+        SDL_Flip(surface);
+        
+        /* Wait for next clock tick */
+        while (last_clock_tick == clock_60hz()) {
+            SDL_Delay(1);
+        }
+        last_clock_tick = clock_60hz();
+    }
 }
 
 #endif /* def SYSTEM_TEST */

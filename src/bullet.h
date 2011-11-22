@@ -231,24 +231,23 @@ extern bullet_ext *free_extended_head;
 extern bullet_ext *free_extended_tail;
 extern SDL_mutex  *free_extended_lock;
 
-bullet *make_bullet(rect_point loc, rect_point vel, bullet_type *type);
+extern bullet *make_bullet(rect_point loc, rect_point vel, bullet_type *type);
 
-int process_bullet(bullet *bul);
-int collide_bullet(bullet *bul, rect_point p, fixed_t rad);
+extern int process_bullet(bullet *bul);
+extern int collide_bullet(bullet *bul, rect_point p, fixed_t rad);
 
-void destroy_bullet(bullet *bul);
+extern void destroy_bullet(bullet *bul);
 
 /* Sets up the linked lists */
-int init_bullets(void);
+extern int init_bullets(void);
 
 /* Clears all bullets */
-void reset_bullets(void);
+extern void reset_bullets(void);
 
 /* Destroys all bullets and the linked lists */
-int stop_bullets(void);
+extern void stop_bullets(void);
 
-/* This is only a few function calls, so it can be inline */
-inline void draw_bullet(bullet *bul, SDL_Surface *screen,
+extern void draw_bullet(bullet *bul, SDL_Surface *screen,
                         int center_x, int center_y);
 
 /* The extents of the squares at which bullets disappear */

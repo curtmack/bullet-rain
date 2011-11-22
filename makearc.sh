@@ -18,10 +18,18 @@ ARCNAME="${BASENAME}.tgz"
 echo "Making archive..."
 echo "cd $1"
 cd $1
+echo "mkdir ../temp"
+mkdir ../temp
+echo "mv .svn ../temp"
+mv .svn ../temp
 echo "${TAR} ${ARCNAME} *"
 ${TAR} ${ARCNAME} *
 echo "mv ${ARCNAME} .."
 mv ${ARCNAME} ..
+echo "mv ../temp/.svn ."
+mv ../temp/.svn .
+echo "rmdir ../temp"
+rmdir ../temp
 echo "Done!"
 
 fi

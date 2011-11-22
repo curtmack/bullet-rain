@@ -180,7 +180,7 @@ void reset_bullets(void)
 }
 
 /* Destroys all bullets and the linked lists */
-int stop_bullets(void)
+void stop_bullets(void)
 {
     /* 
      * TODO: At the moment we don't actually care if we destroy the bullets,
@@ -191,13 +191,9 @@ int stop_bullets(void)
     
     SDL_DestroyMutex(free_bullets_lock);
     SDL_DestroyMutex(free_extended_lock);
-    
-    return 0;
 }
 
-/* This is only a few function calls, so it can be inline */
-inline void draw_bullet(bullet *bul, SDL_Surface *screen,
-                        int center_x, int center_y)
+void draw_bullet(bullet *bul, SDL_Surface *screen, int center_x, int center_y)
 {
     SDL_Rect drawdst;
     
