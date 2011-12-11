@@ -34,7 +34,8 @@
  */
 
 /* These are the only externally-facing parts of the system */
-extern Uint32 clock_60hz(void);
+/* This function gets the current clock value */
+extern inline Uint32 clock_60hz(void);
 
 /* Start/stop functions */
 extern int  init_timer(void);

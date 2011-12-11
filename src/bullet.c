@@ -34,7 +34,8 @@ SDL_mutex  *free_extended_lock;
  * Make a bullet 
  * TODO: So much missing...
  */
-bullet *make_bullet(rect_point loc, rect_point vel, bullet_type *type)
+bullet *make_bullet(fixed_t locx, fixed_t locy,
+                    fixed_t velx, fixed_t vely, bullet_type *type)
 {
     bullet *newbullet;
     int r;
@@ -61,8 +62,10 @@ bullet *make_bullet(rect_point loc, rect_point vel, bullet_type *type)
     set_alive(newbullet, TRUE);
     
     /* Copy over all the other stuff we have */
-    newbullet->rect_vel = vel;
-    newbullet->center = loc;
+    newbullet->velx = velx;
+    newbullet->vely = vely;
+    newbullet->centerx = locx;
+    newbullet->centery = locy;
     newbullet->extend = FALSE;
     newbullet->next = NULL;
     
@@ -74,19 +77,19 @@ bullet *make_bullet(rect_point loc, rect_point vel, bullet_type *type)
  * TODO: This does not do anything with the extended block!
  */
 
-int process_bullet(bullet *bul)
+inline int process_bullet(bullet *bul)
 {
     /* Update various coordinates */
-    (bul->center).x += (bul->rect_vel).x;
-    (bul->center).y += (bul->rect_vel).y;
-    (bul->tl).y += (bul->rect_vel).y;
-    (bul->tl).y += (bul->rect_vel).y;
-    (bul->lr).y += (bul->rect_vel).y;
-    (bul->lr).y += (bul->rect_vel).y;
+    bul->centerx += bul->velx;
+    bul->centery += bul->vely;
+    bul->tlx     += bul->velx;
+    bul->tly     += bul->vely;
+    bul->lrx     += bul->velx;
+    bul->lry     += bul->vely;
     
     /* Is it gone? */
-    if ((bul->center).x > OUT_OF_BOUNDS || (bul->center).x < -OUT_OF_BOUNDS ||
-        (bul->center).y > OUT_OF_BOUNDS || (bul->center).y < -OUT_OF_BOUNDS) {
+    if (bul->centerx > OUT_OF_BOUNDS || bul->centerx < -OUT_OF_BOUNDS ||
+        bul->centery > OUT_OF_BOUNDS || bul->centery < -OUT_OF_BOUNDS) {
         destroy_bullet(bul);
         return 1;
     }
@@ -95,10 +98,10 @@ int process_bullet(bullet *bul)
 }
 
 /* Check if the bullet is colliding with the given circle */
-int collide_bullet(bullet *bul, rect_point p, fixed_t rad)
+inline int collide_bullet(bullet *bul, fixed_t px, fixed_t py, fixed_t rad)
 {
     fixed_t sors = fixmul(rad+bul->rad, rad+bul->rad); /* sum of radii squared */
-    return circle_collide(bul->center, p, sors);
+    return circle_collide(bul->centerx, bul->centery, px, py, sors);
 }
 
 /* Destroy a bullet */
@@ -193,13 +196,13 @@ void stop_bullets(void)
     SDL_DestroyMutex(free_extended_lock);
 }
 
-void draw_bullet(bullet *bul, SDL_Surface *screen, int center_x, int center_y)
+inline void draw_bullet(bullet *bul, SDL_Surface *screen, int center_x, int center_y)
 {
     SDL_Rect drawdst;
     
     if (!is_alive(bul)) return;
-    drawdst.x = intpart((bul->center).x + (bul->drawloc).x) + center_x;
-    drawdst.y = intpart((bul->center).y + (bul->drawloc).y) + center_y;
+    drawdst.x = intpart(bul->centerx + bul->drawlocx) + center_x;
+    drawdst.y = intpart(bul->centery + bul->drawlocy) + center_y;
     /* w and h are immaterial */
     SDL_BlitSurface(bul->img, NULL, screen, &drawdst);
 }

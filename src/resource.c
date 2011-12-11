@@ -251,7 +251,7 @@ arclist *load_arc(char *arcname)
             prev = curr;
             for (; curr != NULL && curr->id < temphash;
                 prev = curr, curr = curr->next);
-            if (curr->id == temphash) {
+            if (curr != NULL && curr->id == temphash) {
                 /* Settle hash ties via strcmp */
                 for (; curr != NULL && strcmp(curr->name, arcname) < 0;
                     prev = curr, curr = curr->next);
@@ -300,7 +300,7 @@ arclist *load_arc(char *arcname)
     /*
      * Start reading
      * Yes, we're sending a pointer to the pointer to the entry.
-     * This is by design. I have no idea why.
+     * This is needed so libarchive can assign a new entry object if necessary
      */
     while (archive_read_next_header(newarc, &entry) == ARCHIVE_OK) {
         tempname = (char*) archive_entry_pathname(entry);

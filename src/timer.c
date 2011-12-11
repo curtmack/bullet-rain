@@ -49,8 +49,9 @@ Uint32 clock_60hz(void)
 
 /* 
  * For error calculation 
- * We keep track in nanoseconds, but the resolution of most computer clocks
- * is only 10 milliseconds (conservatively)
+ * We keep track in nanoseconds, but between the actual resolution of the clock
+ * and multithreading delays, we can only guarantee a safe interval of about
+ * 10 milliseconds, conservatively
  * Whenever the accumulated error is more than this resolution (absolutely),
  * we add or subtract 10 ms from the next interval length, depending on
  * what the sign of the error is

@@ -36,6 +36,12 @@
 /* Size of hash map used to store config entries */
 #define CONFIG_HASH_SIZE  1024
 
+/* 
+ * Profile code using shinyprofiler
+ * See README for information setting this up
+ */
+/* #define USE_PROFILE */
+
 /* Compile system tests rather than the usual main() */
 #define SYSTEM_TEST
 

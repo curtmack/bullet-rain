@@ -1246,7 +1246,7 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
     bullet_type sm[12];
     bullet_type lg[12];
     
-    rect_point vel, pt;
+    fixed_t velx, vely, px, py;
     
     int i, bullets_made = 0, numbullets = 0;
     Uint32 lasttime = SDL_GetTicks(), newtime, frametotal = 0;
@@ -1274,23 +1274,23 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
         sm[i].flags     = 0;
         sm[i].gameflags = 0;
         sm[i].lua       = NULL;
-        sm[i].tl.x      = tofixed(-4,0);
-        sm[i].tl.y      = tofixed(-4,0);
-        sm[i].lr.x      = tofixed(4,0);
-        sm[i].lr.y      = tofixed(4,0);
-        sm[i].drawloc.x = tofixed(-4,0);
-        sm[i].drawloc.y = tofixed(-4,0);
+        sm[i].tlx       = tofixed(-4,0);
+        sm[i].tly       = tofixed(-4,0);
+        sm[i].lrx       = tofixed(4,0);
+        sm[i].lry       = tofixed(4,0);
+        sm[i].drawlocx  = tofixed(-4,0);
+        sm[i].drawlocy  = tofixed(-4,0);
         
         lg[i].rad       = tofixed(12, 0);
         lg[i].flags     = 0;
         lg[i].gameflags = 0;
         lg[i].lua       = NULL;
-        lg[i].tl.x      = tofixed(-12,0);
-        lg[i].tl.y      = tofixed(-12,0);
-        lg[i].lr.x      = tofixed(12,0);
-        lg[i].lr.y      = tofixed(12,0);
-        lg[i].drawloc.x = tofixed(-16,0);
-        lg[i].drawloc.y = tofixed(-16,0);
+        lg[i].tlx       = tofixed(-12,0);
+        lg[i].tly       = tofixed(-12,0);
+        lg[i].lrx       = tofixed(12,0);
+        lg[i].lry       = tofixed(12,0);
+        lg[i].drawlocx  = tofixed(-16,0);
+        lg[i].drawlocy  = tofixed(-16,0);
         
         /* Now we need to get the images */
         switch (i) {
@@ -1503,18 +1503,18 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
             }
             /* flooding screen with bullets is bad, hence the limit */
             else if (bullets_made < 12) {
-                pt.x  = tofixed(rand()%640-320, rand()%65536-32768);
-                pt.y  = tofixed(rand()%480-240, rand()%65536-32768);
-                vel.x = tofixed(rand()%4 - 2,   rand()%65536-32768);
-                vel.y = tofixed(rand()%4 - 2,   rand()%65536-32768);
+                px   = tofixed(rand()%640-320, rand()%65536-32768);
+                py   = tofixed(rand()%480-240, rand()%65536-32768);
+                velx = tofixed(rand()%4 - 2,   rand()%65536-32768);
+                vely = tofixed(rand()%4 - 2,   rand()%65536-32768);
                 if (rand()%2) {
-                    if (make_bullet(pt, vel, &sm[rand()%12]) != NULL) {
+                    if (make_bullet(px, py, velx, vely, &sm[rand()%12]) != NULL) {
                         ++numbullets;
                         ++bullets_made;
                     }
                 }
                 else {
-                    if (make_bullet(pt, vel, &lg[rand()%12]) != NULL) {
+                    if (make_bullet(px, py, velx, vely, &lg[rand()%12]) != NULL) {
                         ++numbullets;
                         ++bullets_made;
                     }
@@ -1573,7 +1573,7 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     bullet_type miss[2];
     bullet_type hit[2];
     
-    rect_point vel, pt;
+    fixed_t velx, vely, px, py;
     
     int i, j, mouse_x, mouse_y;
     
@@ -1597,45 +1597,45 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     miss[0].flags     = 0;
     miss[0].gameflags = 0;
     miss[0].lua       = NULL;
-    miss[0].tl.x      = tofixed(-4,0);
-    miss[0].tl.y      = tofixed(-4,0);
-    miss[0].lr.x      = tofixed(4,0);
-    miss[0].lr.y      = tofixed(4,0);
-    miss[0].drawloc.x = tofixed(-4,0);
-    miss[0].drawloc.y = tofixed(-4,0);
+    miss[0].tlx       = tofixed(-4,0);
+    miss[0].tly       = tofixed(-4,0);
+    miss[0].lrx       = tofixed(4,0);
+    miss[0].lry       = tofixed(4,0);
+    miss[0].drawlocx  = tofixed(-4,0);
+    miss[0].drawlocy  = tofixed(-4,0);
     
     hit[0].rad       = tofixed(4, 0);
     hit[0].flags     = 0;
     hit[0].gameflags = 0;
     hit[0].lua       = NULL;
-    hit[0].tl.x      = tofixed(-4,0);
-    hit[0].tl.y      = tofixed(-4,0);
-    hit[0].lr.x      = tofixed(4,0);
-    hit[0].lr.y      = tofixed(4,0);
-    hit[0].drawloc.x = tofixed(-4,0);
-    hit[0].drawloc.y = tofixed(-4,0);
+    hit[0].tlx       = tofixed(-4,0);
+    hit[0].tly       = tofixed(-4,0);
+    hit[0].lrx       = tofixed(4,0);
+    hit[0].lry       = tofixed(4,0);
+    hit[0].drawlocx  = tofixed(-4,0);
+    hit[0].drawlocy  = tofixed(-4,0);
     
     miss[1].rad       = tofixed(12, 0);
     miss[1].flags     = 0;
     miss[1].gameflags = 1; /* we're cheating here, this means it's big */
     miss[1].lua       = NULL;
-    miss[1].tl.x      = tofixed(-12,0);
-    miss[1].tl.y      = tofixed(-12,0);
-    miss[1].lr.x      = tofixed(12,0);
-    miss[1].lr.y      = tofixed(12,0);
-    miss[1].drawloc.x = tofixed(-16,0);
-    miss[1].drawloc.y = tofixed(-16,0);
+    miss[1].tlx       = tofixed(-12,0);
+    miss[1].tly       = tofixed(-12,0);
+    miss[1].lrx       = tofixed(12,0);
+    miss[1].lry       = tofixed(12,0);
+    miss[1].drawlocx  = tofixed(-16,0);
+    miss[1].drawlocy  = tofixed(-16,0);
     
     hit[1].rad       = tofixed(12, 0);
     hit[1].flags     = 0;
     hit[1].gameflags = 1;
     hit[1].lua       = NULL;
-    hit[1].tl.x      = tofixed(-12,0);
-    hit[1].tl.y      = tofixed(-12,0);
-    hit[1].lr.x      = tofixed(12,0);
-    hit[1].lr.y      = tofixed(12,0);
-    hit[1].drawloc.x = tofixed(-16,0);
-    hit[1].drawloc.y = tofixed(-16,0);
+    hit[1].tlx       = tofixed(-12,0);
+    hit[1].tly       = tofixed(-12,0);
+    hit[1].lrx       = tofixed(12,0);
+    hit[1].lry       = tofixed(12,0);
+    hit[1].drawlocx  = tofixed(-16,0);
+    hit[1].drawlocy  = tofixed(-16,0);
         
     /* Now we need to get the images */
     
@@ -1673,18 +1673,18 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
      */
     for (i = 0; i < 12; ++i) {
         for (j = 0; j < 16; ++j) {
-            pt.x = fixmul(fixdiv(tofixed(640,0),tofixed(17,0)),tofixed(j+1,0));
-            pt.x -= tofixed(center_x,0);
-            pt.y = fixmul(fixdiv(tofixed(480,0),tofixed(13,0)),tofixed(i+1,0));
-            pt.y -= tofixed(center_y,0);
-            vel.x = fixzero;
-            vel.y = fixzero;
+            px   = fixmul(fixdiv(tofixed(640,0),tofixed(17,0)),tofixed(j+1,0));
+            px  -= tofixed(center_x,0);
+            py   = fixmul(fixdiv(tofixed(480,0),tofixed(13,0)),tofixed(i+1,0));
+            py  -= tofixed(center_y,0);
+            velx = fixzero;
+            vely = fixzero;
             
             if ((i+j) % 2 == 1) {
-                make_bullet(pt, vel, &miss[0]);
+                make_bullet(px, py, velx, vely, &miss[0]);
             }
             else {
-                make_bullet(pt, vel, &miss[1]);
+                make_bullet(px, py, velx, vely, &miss[1]);
             }
         }
     }
@@ -1698,15 +1698,15 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
         /* need this relative to the center */
         mouse_x -= center_x;
         mouse_y -= center_y;
-        pt.x = tofixed(mouse_x, 0);
-        pt.y = tofixed(mouse_y, 0);
+        px = tofixed(mouse_x, 0);
+        py = tofixed(mouse_y, 0);
         
         /* We may as well process all the bullets, most of them are gone */
         for (i = 0; i < 8192; ++i) {
             tmp = &bullet_mem[i];
             if (is_alive(tmp)) {
                 process_bullet(tmp);
-                if(collide_bullet(tmp, pt, fixzero)) {
+                if(collide_bullet(tmp, px, py, fixzero)) {
                     if(tmp->gameflags) {
                         tmp->img = hit[1].img;
                     }
@@ -1746,15 +1746,84 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
     player ship;
     SDL_Event event;
     Uint32 last_clock_tick;
+    SDL_Surface *temp, *tempsrc;
+    SDL_PixelFormat *fmt;
+    SDL_Rect rect;
+    bullet_type enemy;
+    bullet_type shot_a;
+    bullet_type shot_b;
     pbullet *tmp;
-    int i;
+    bullet *tmpb;
+    int i,j;
+    fixed_t xvel, yvel;
+    angle_t dir;
     
+#define ENEMY_TIMER  120
+#define SHOT_A_TIMER 120
+#define SHOT_B_TIMER 60
+
+    int next_enemy_timer = ENEMY_TIMER;
+    int next_shot_a_timer = SHOT_A_TIMER;
+    int next_shot_b_timer = SHOT_B_TIMER;
+
     const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
+    const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
+    
+    reset_pbullets();
     
     ship = make_coreship();
     setup_coreship(0);
-    ship.center.x = fixzero;
-    ship.center.y = fixzero;
+    ship.centerx = fixzero;
+    ship.centery = fixzero;
+    
+    tempsrc = (SDL_Surface*)(get_res("res/brcore.tgz", "enemy.png")->data);
+    SDL_SetColorKey(tempsrc, SDL_SRCCOLORKEY, colorkey);
+    enemy.img = tempsrc;
+    enemy.drawlocx  = tofixed(-16,0);
+    enemy.drawlocy  = tofixed(-16,0);
+    enemy.rad       = tofixed(16, 0);
+    enemy.tlx       = tofixed(-16,0);
+    enemy.tly       = tofixed(-16,0);
+    enemy.lrx       = tofixed(16, 0);
+    enemy.lry       = tofixed(16, 0);
+    enemy.flags     = ENEMY;
+    enemy.gameflags = 0;
+    
+    tempsrc = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
+    fmt = tempsrc->format;
+    temp = SDL_CreateRGBSurface(SDL_SWSURFACE,32,32,fmt->BitsPerPixel,
+                                fmt->Rmask,fmt->Gmask,fmt->Bmask,fmt->Amask);
+    rectset(rect, 64, 32, 32, 32);
+    SDL_BlitSurface(tempsrc, &rect, temp, NULL);
+    SDL_SetColorKey(temp, SDL_SRCCOLORKEY, colorkey);
+    shot_a.img = temp;
+    shot_a.drawlocx  = tofixed(-16,0);
+    shot_a.drawlocy  = tofixed(-16,0);
+    shot_a.rad       = tofixed(12, 0);
+    shot_a.tlx       = tofixed(-12,0);
+    shot_a.tly       = tofixed(-12,0);
+    shot_a.lrx       = tofixed(12, 0);
+    shot_a.lry       = tofixed(12, 0);
+    shot_a.flags     = 0;
+    shot_a.gameflags = 0;
+    
+    tempsrc = (SDL_Surface*)(get_res("res/brcore.tgz", "smbullet.png")->data);
+    fmt = tempsrc->format;
+    temp = SDL_CreateRGBSurface(SDL_SWSURFACE,8,8,fmt->BitsPerPixel,
+                                fmt->Rmask,fmt->Gmask,fmt->Bmask,fmt->Amask);
+    rectset(rect, 0, 24, 8, 8);
+    SDL_BlitSurface(tempsrc, &rect, temp, NULL);
+    SDL_SetColorKey(temp, SDL_SRCCOLORKEY, colorkey);
+    shot_b.img = temp;
+    shot_b.drawlocx  = tofixed(-4,0);
+    shot_b.drawlocy  = tofixed(-4,0);
+    shot_b.rad       = tofixed(4, 0);
+    shot_b.tlx       = tofixed(-4,0);
+    shot_b.tly       = tofixed(-4,0);
+    shot_b.lrx       = tofixed(4, 0);
+    shot_b.lry       = tofixed(4, 0);
+    shot_b.flags     = 0;
+    shot_b.gameflags = 0;
     
     last_clock_tick = clock_60hz();
     
@@ -1790,12 +1859,87 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
         for (i = 0; i < 1024; ++i) {
             tmp = &pbullet_mem[i];
             if (pis_alive(tmp)) {
-                draw_pbullet(*tmp, surface, 320, 240);
+                draw_pbullet(tmp, surface, 320, 240);
             }
         }
         
         /* Draw the ship */
-        draw_player(ship, surface, 320, 240);
+        draw_player(&ship, surface, 320, 240);
+        
+        /* Now handle enemy stuff */
+        /* Update all the timers */
+        --next_enemy_timer;
+        if (next_enemy_timer < 0) next_enemy_timer = ENEMY_TIMER;
+        --next_shot_a_timer;
+        if (next_shot_a_timer < 0) next_shot_a_timer = SHOT_A_TIMER;
+        --next_shot_b_timer;
+        if (next_shot_b_timer < 0) next_shot_b_timer = SHOT_B_TIMER;
+        
+        /* Update all the bullets */
+        for (i = 0; i < 8192; ++i) {
+            tmpb = &bullet_mem[i];
+            if (is_alive(tmpb)) {
+                process_bullet(tmpb);
+                if (is_enemy(tmpb)) {
+                    /* Check if it's colliding with a pbullet */
+                    for (j = 0; j < 1024; ++j) {
+                        tmp = &pbullet_mem[j];
+                        if (pis_alive(tmp)) {
+                            if (collide_pbullet(tmp, tmpb)) {
+                                destroy_pbullet(tmp);
+                                destroy_bullet(tmpb);
+                                break;
+                            }
+                        }
+                    }
+                    /* We need to check if we're still alive now */
+                    /* Check if we're supposed to fire */
+                    if (is_alive(tmpb) && tmpb->velx > 0 && next_shot_a_timer == 0) {
+                        /* Shooting off a bullet in all 8 directions */
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    tofixed( 1, 32768), 0, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    tofixed(-1,-32768), 0, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    0, tofixed( 1, 32768), &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    0, tofixed(-1,-32768), &shot_a);
+                                    
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    tofixed( 1, 4183), tofixed( 1, 4183), &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    tofixed(-1,-4183), tofixed( 1, 4183), &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    tofixed( 1, 4183), tofixed(-1,-4183), &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                    tofixed(-1,-4183), tofixed(-1,-4183), &shot_a);
+                    }
+                    if (is_alive(tmpb) && tmpb->velx < 0 && next_shot_b_timer == 0) {
+                        /* Shooting off 6 bullets in random directions */
+                        for (j = 0; j < 6; ++j) {
+                            /* Gives a random angle in the valid range */
+                            dir = (rand()%1024 << 14);
+                            polar_to_rect(fixone, dir, &xvel, &yvel);
+                            make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                                        xvel, yvel, &shot_b);
+                        }
+                    }
+                }
+                
+                /* Draw */
+                /* if (is_alive(tmpb)) { */
+                    draw_bullet(tmpb, surface, 320, 240);
+                /* } */
+            }
+        }
+        
+        /* Check if we need to make more enemies */
+        if (next_enemy_timer == 0) {
+            make_bullet(tofixed(-360,0), tofixed(-120,0), tofixed(1,8192), 0,
+                        &enemy);
+            make_bullet(tofixed(360,0), tofixed(-180,0), tofixed(-1,-8192), 0,
+                        &enemy);
+        }
         
         /* Flip the screen */
         SDL_Flip(surface);

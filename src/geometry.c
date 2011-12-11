@@ -84,11 +84,9 @@ fixed_t lookup_cos(angle_t ang)
     return fixmul(h,d)+fixmul(l,((fixed_t)0x00010000)-d);
 }
 
-rect_point polar_to_rect(polar_point p)
+void polar_to_rect(fixed_t pr, angle_t pt, fixed_t *x, fixed_t *y)
 {
-    rect_point r;
     /* Straightforward */
-    r.x = fixmul(p.r, lookup_cos(p.t));
-    r.y = fixmul(p.r, lookup_sin(p.t));
-    return r;
+    if (x != NULL) *x = fixmul(pr, lookup_cos(pt));
+    if (y != NULL) *y = fixmul(pr, lookup_sin(pt));
 }

@@ -15,10 +15,12 @@
 #include "collmath.h"
 
 /* point, point, sum of the radii squared */
-int circle_collide(rect_point a, rect_point b, fixed_t sors) {
+int circle_collide(fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by,
+                          fixed_t sors)
+{
     /* Here, we need to prevent overflow */
     Sint64 tmp;
-    tmp = (Sint64) fixmul(a.x-b.x, a.x-b.x) + fixmul(a.y-b.y, a.y-b.y);
+    tmp = (Sint64) fixmul(ax-bx, ax-bx) + fixmul(ay-by, ay-by);
     if ((Sint32)tmp != tmp) {
         /* We overflowed, just return false */
         return FALSE;
@@ -27,13 +29,12 @@ int circle_collide(rect_point a, rect_point b, fixed_t sors) {
 }
 
 /* top-left point, lower-right point, top-left point, lower-right point */
-int aabb_collide(rect_point tla, rect_point lra, 
-                 rect_point tlb, rect_point lrb) {
-    return (
-        /* horizontal overlap */
-        ((tla.x > tlb.x && tla.x < lrb.x) || (lra.x > tlb.x && lra.x < lrb.x))
-        &&
-        /* vertical overlap */
-        ((tla.y > tlb.y && tla.y < lrb.y) || (lra.y > tlb.y && lra.y < lrb.y))
-    );
+int aabb_collide(fixed_t tlax, fixed_t tlay, fixed_t lrax, fixed_t lray,
+                 fixed_t tlbx, fixed_t tlby, fixed_t lrbx, fixed_t lrby)
+{
+    /* horizontal overlap */
+    if (lrax < tlbx || tlax > lrbx) return FALSE;
+    /* vertical overlap */
+    if (lray < tlby || tlay > lrby) return FALSE;
+    return TRUE;
 }

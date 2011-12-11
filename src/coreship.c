@@ -123,36 +123,36 @@ int init_coreship (void)
     right_shot_sprite = tmp;
     
     /* Create the pbullet_types */
-    (main_shot.tl).x       = tofixed(-4,0);
-    (main_shot.tl).y       = tofixed(-3,0);
-    (main_shot.lr).x       = tofixed(4,0);
-    (main_shot.lr).y       = tofixed(4,0);
-    (main_shot.drawloc).x  = tofixed(0,0);
-    (main_shot.drawloc).y  = tofixed(-1,0);
+    main_shot.tlx          = tofixed(-4,0);
+    main_shot.tly          = tofixed(-3,0);
+    main_shot.lrx          = tofixed(4,0);
+    main_shot.lry          = tofixed(4,0);
+    main_shot.drawlocx     = tofixed(0,0);
+    main_shot.drawlocy     = tofixed(-1,0);
     main_shot.img          = main_shot_sprite;
     main_shot.flags        = 0;
     main_shot.gameflags    = 0;
     main_shot.enemy_damage = 150;
     main_shot.boss_damage  = 150;
     
-    (left_shot.tl).x       = tofixed(-3,0);
-    (left_shot.tl).y       = tofixed(-3,0);
-    (left_shot.lr).x       = tofixed(3,0);
-    (left_shot.lr).y       = tofixed(3,0);
-    (left_shot.drawloc).x  = tofixed(-1,0);
-    (left_shot.drawloc).y  = tofixed(-1,0);
+    left_shot.tlx          = tofixed(-3,0);
+    left_shot.tly          = tofixed(-3,0);
+    left_shot.lrx          = tofixed(3,0);
+    left_shot.lry          = tofixed(3,0);
+    left_shot.drawlocx     = tofixed(-1,0);
+    left_shot.drawlocy     = tofixed(-1,0);
     left_shot.img          = left_shot_sprite;
     left_shot.flags        = 0;
     left_shot.gameflags    = 0;
     left_shot.enemy_damage = 65;
     left_shot.boss_damage  = 65;
     
-    (right_shot.tl).x       = tofixed(-3,0);
-    (right_shot.tl).y       = tofixed(-3,0);
-    (right_shot.lr).x       = tofixed(3,0);
-    (right_shot.lr).y       = tofixed(3,0);
-    (right_shot.drawloc).x  = tofixed(-1,0);
-    (right_shot.drawloc).y  = tofixed(-1,0);
+    right_shot.tlx          = tofixed(-3,0);
+    right_shot.tly          = tofixed(-3,0);
+    right_shot.lrx          = tofixed(3,0);
+    right_shot.lry          = tofixed(3,0);
+    right_shot.drawlocx     = tofixed(-1,0);
+    right_shot.drawlocy     = tofixed(-1,0);
     right_shot.img          = right_shot_sprite;
     right_shot.flags        = 0;
     right_shot.gameflags    = 0;
@@ -177,8 +177,8 @@ player make_coreship (void)
     ship.img = ship_main_sprite;
     ship.anim[0] = ship_main_sprite;
     
-    (ship.drawloc).x = tofixed(-8,0);
-    (ship.drawloc).y = tofixed(-9,0);
+    ship.drawlocx = tofixed(-8,0);
+    ship.drawlocy = tofixed(-9,0);
     
     ship.rad = fixone;
     
@@ -232,31 +232,43 @@ void update_coreship (int id, player *ship)
     
     /* Check inputs and move ship/shoot accordingly */
     if (input_value(CORESHIP_INPUT_UP + id*5)) {
-        (ship->center).y -= tofixed(3, 21845);
+        ship->centery -= tofixed(3, 21845);
+        if (ship->centery < tofixed(-240,0)) {
+            ship->centery = tofixed(-240,0);
+        }
     }
     if (input_value(CORESHIP_INPUT_DOWN + id*5)) {
-        (ship->center).y += tofixed(3, 21845);
+        ship->centery += tofixed(3, 21845);
+        if (ship->centery > tofixed(240,0)) {
+            ship->centery = tofixed(240,0);
+        }
     }
     if (input_value(CORESHIP_INPUT_LEFT + id*5)) {
-        (ship->center).x -= tofixed(3, 21845);
+        ship->centerx -= tofixed(3, 21845);
+        if (ship->centerx < tofixed(-320,0)) {
+            ship->centerx = tofixed(-320,0);
+        }
     }
     if (input_value(CORESHIP_INPUT_RIGHT + id*5)) {
-        (ship->center).x += tofixed(3, 21845);
+        ship->centerx += tofixed(3, 21845);
+        if (ship->centerx > tofixed(320,0)) {
+            ship->centerx = tofixed(320,0);
+        }
     }
     if (input_value(CORESHIP_INPUT_SHOOT + id*5)) {
         if (ship->gamedata[TIME_TO_MAIN_SHOT] <= 0) {
             ship->gamedata[TIME_TO_MAIN_SHOT] = 5;
-            make_pbullet(&main_shot, (ship->center.x),
-                         (ship->center).y-tofixed(8,0),
+            make_pbullet(&main_shot, ship->centerx,
+                         ship->centery-tofixed(8,0),
                          fixzero, -tofixed(6,43691), FALSE);
         }
         if (ship->gamedata[TIME_TO_SIDE_SHOT] <= 0) {
             ship->gamedata[TIME_TO_SIDE_SHOT] = 10;
-            make_pbullet(&left_shot, (ship->center).x-tofixed(6,0),
-                         (ship->center).y-tofixed(6,0), -tofixed(3,21845),
+            make_pbullet(&left_shot, ship->centerx-tofixed(6,0),
+                         ship->centery-tofixed(6,0), -tofixed(3,21845),
                          -tofixed(5,50692), FALSE);
-            make_pbullet(&right_shot, ship->center.x+tofixed(6,0),
-                         (ship->center).y-tofixed(6,0), tofixed(3,21845),
+            make_pbullet(&right_shot, ship->centerx+tofixed(6,0),
+                         ship->centery-tofixed(6,0), tofixed(3,21845),
                          -tofixed(5,50692), FALSE);
         }
     }

@@ -42,7 +42,8 @@ struct bullet_ {
        bullet *parent;
 
        /* Coordinates of bullet */
-       rect_point center;
+       fixed_t centerx;
+       fixed_t centery;
 
        /*
         * These next variables are in this order so they can be
@@ -63,17 +64,22 @@ struct bullet_ {
        resource *lua_script;
 
        /* AABB information - relative from center */
-       rect_point tl;
-       rect_point lr;
+       fixed_t tlx;
+       fixed_t tly;
+       fixed_t lrx;
+       fixed_t lry;
 
        /* Display data */
-       rect_point   drawloc;
+       fixed_t drawlocx;
+       fixed_t drawlocy;
        
        /* That's all we memcpy over */
 
        /* Velocity (rectangular and polar) */
-       rect_point  rect_vel;
-       polar_point polar_vel;
+       fixed_t velx;
+       fixed_t vely;
+       fixed_t vel_mag;
+       angle_t vel_dir;
 
        /* Extended pointer */
        bullet_ext *extend;
@@ -114,11 +120,14 @@ struct bullet_type_ {
        resource *lua;
 
        /* AABB information - relative from center */
-       rect_point tl;
-       rect_point lr;
+       fixed_t tlx;
+       fixed_t tly;
+       fixed_t lrx;
+       fixed_t lry;
 
-       /* Draw location - relative from center */
-       rect_point drawloc;
+       /* Display data */
+       fixed_t drawlocx;
+       fixed_t drawlocy;
 };
 
 /* Defines for bitfield in bullet->flags */
@@ -231,10 +240,11 @@ extern bullet_ext *free_extended_head;
 extern bullet_ext *free_extended_tail;
 extern SDL_mutex  *free_extended_lock;
 
-extern bullet *make_bullet(rect_point loc, rect_point vel, bullet_type *type);
+extern bullet *make_bullet(fixed_t locx, fixed_t locy,
+                           fixed_t velx, fixed_t vely, bullet_type *type);
 
-extern int process_bullet(bullet *bul);
-extern int collide_bullet(bullet *bul, rect_point p, fixed_t rad);
+extern inline int process_bullet(bullet *bul);
+extern inline int collide_bullet(bullet *bul, fixed_t px, fixed_t py, fixed_t rad);
 
 extern void destroy_bullet(bullet *bul);
 
@@ -247,8 +257,8 @@ extern void reset_bullets(void);
 /* Destroys all bullets and the linked lists */
 extern void stop_bullets(void);
 
-extern void draw_bullet(bullet *bul, SDL_Surface *screen,
-                        int center_x, int center_y);
+extern inline void draw_bullet(bullet *bul, SDL_Surface *screen,
+                               int center_x, int center_y);
 
 /* The extents of the squares at which bullets disappear */
 #define OUT_OF_BOUNDS      tofixed(400,0)

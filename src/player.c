@@ -45,7 +45,7 @@ player *get_player (int id)
     return &(players[id]);
 }
 
-void update_player (int id, player *plr)
+inline void update_player (int id, player *plr)
 {
     /* 
      * TODO: At some point we need to make this actually check the script,
@@ -54,17 +54,17 @@ void update_player (int id, player *plr)
     update_coreship(id, plr);
 }
 
-void update_pbullet (pbullet *pbul)
+inline void update_pbullet (pbullet *pbul)
 {
-    (pbul->tl).x += (pbul->rect_vel).x;
-    (pbul->tl).y += (pbul->rect_vel).y;
-    (pbul->lr).x += (pbul->rect_vel).x;
-    (pbul->lr).y += (pbul->rect_vel).y;
+    pbul->tlx += pbul->velx;
+    pbul->tly += pbul->vely;
+    pbul->lrx += pbul->velx;
+    pbul->lry += pbul->vely;
     
-    if ((pbul->tl).x < tofixed(-1024,0) || (pbul->tl).y < tofixed(-1024,0) ||
-        (pbul->lr).x > tofixed( 1024,0) || (pbul->lr).y > tofixed( 1024,0)) {
+    if (pbul->tlx < tofixed(-400,0) || pbul->tly < tofixed(-400,0) ||
+        pbul->lrx > tofixed( 400,0) || pbul->lry > tofixed( 400,0)) {
         
-        pset_alive(pbul, FALSE);
+        destroy_pbullet(pbul);
     }
 }
 
@@ -91,47 +91,70 @@ pbullet *make_pbullet (pbullet_type *type, fixed_t x, fixed_t y,
     check_mutex(r);
     
     /* Start making the new pbullet */
-    memcpy(&(pbul->tl), type, sizeof(pbullet_type));
+    memcpy(&(pbul->tlx), type, sizeof(pbullet_type));
     pset_alive(pbul, TRUE);
     
     /* Copy over all the other stuff we have */
-    (pbul->rect_vel).x = xvel;
-    (pbul->rect_vel).y = yvel;
-    (pbul->tl).x += x;
-    (pbul->tl).y += y;
-    (pbul->lr).x += x;
-    (pbul->lr).y += y;
+    pbul->velx = xvel;
+    pbul->vely = yvel;
+    pbul->tlx += x;
+    pbul->tly += y;
+    pbul->lrx += x;
+    pbul->lry += y;
     pbul->next = NULL;
     
     return pbul;
 }
 
-int collide_pbullet (pbullet pbul, bullet bul)
+inline int collide_pbullet (pbullet *pbul, bullet *bul)
 {
-    return aabb_collide(pbul.tl, pbul.lr, bul.tl, bul.lr);
+    return aabb_collide(pbul->tlx, pbul->tly, pbul->lrx, pbul->lry,
+                         bul->tlx,  bul->tly,  bul->lrx,  bul->lry);
 }
 
-void draw_player (player plr, SDL_Surface *surface,
-                  int center_x, int center_y)
+void destroy_pbullet (pbullet *pbul)
+{
+    int r;
+    
+    pset_alive(pbul, FALSE);
+    pbul->next = NULL;
+    
+    r = SDL_mutexP(free_pbullets_lock);
+    check_mutex(r);
+    
+    if (free_pbullets_head == NULL) {
+        free_pbullets_head = pbul;
+        free_pbullets_tail = pbul;
+    }
+    else {
+        free_pbullets_tail->next = pbul;
+    }
+    
+    r = SDL_mutexV(free_pbullets_lock);
+    check_mutex(r);    
+}
+
+inline void draw_player (player *plr, SDL_Surface *surface,
+                         int center_x, int center_y)
 {
     SDL_Rect rect;
     
-    rect.x = intpart((plr.center).x + (plr.drawloc).x) + center_x;
-    rect.y = intpart((plr.center).y + (plr.drawloc).y) + center_y;
+    rect.x = intpart(plr->centerx + plr->drawlocx) + center_x;
+    rect.y = intpart(plr->centery + plr->drawlocy) + center_y;
     
-    SDL_BlitSurface(plr.img, NULL, surface, &rect);
+    SDL_BlitSurface(plr->img, NULL, surface, &rect);
 }
 
-void draw_pbullet (pbullet pbul, SDL_Surface *surface,
-                   int center_x, int center_y)
+inline void draw_pbullet (pbullet *pbul, SDL_Surface *surface,
+                          int center_x, int center_y)
 {
     SDL_Rect rect;
     
-    if (!pis_alive(&pbul)) return;
-    rect.x = intpart((pbul.tl).x + (pbul.drawloc).x) + center_x;
-    rect.y = intpart((pbul.tl).y + (pbul.drawloc).y) + center_y;
+    if (!pis_alive(pbul)) return;
+    rect.x = intpart(pbul->tlx + pbul->drawlocx) + center_x;
+    rect.y = intpart(pbul->tly + pbul->drawlocy) + center_y;
     
-    SDL_BlitSurface(pbul.img, NULL, surface, &rect);
+    SDL_BlitSurface(pbul->img, NULL, surface, &rect);
 }
 
 void reset_pbullets(void)

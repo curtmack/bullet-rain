@@ -29,11 +29,13 @@
 typedef struct player_ player;
 struct player_ {
     /* Location data */
-    rect_point center;
+    fixed_t centerx;
+    fixed_t centery;
     fixed_t rad;
 
     /* Drawing data */
-    rect_point drawloc;
+    fixed_t drawlocx;
+    fixed_t drawlocy;
     SDL_Surface *img;
 
     /* Flags */
@@ -54,15 +56,20 @@ struct pbullet_ {
     pbullet *next;
     
     /* Movement data */
-    rect_point rect_vel;
-    polar_point polar_vel;
+    fixed_t velx;
+    fixed_t vely;
+    fixed_t vel_mag;
+    fixed_t vel_dir;
     
     /* Hitbox data - note that pbullets use AABBs, not circles */
-    rect_point tl;
-    rect_point lr;
+    fixed_t tlx;
+    fixed_t tly;
+    fixed_t lrx;
+    fixed_t lry;
     
     /* Drawing data, drawloc is relative to tl */
-    rect_point drawloc;
+    fixed_t drawlocx;
+    fixed_t drawlocy;
     SDL_Surface *img;
 
     /* Flags */
@@ -85,11 +92,15 @@ struct pbullet_type_ {
      * added to them - thus, they serve as offsets from the "center point"
      * even though the center point isn't technically a real thing
      */
-    rect_point tl;
-    rect_point lr;
+    /* Hitbox data - note that pbullets use AABBs, not circles */
+    fixed_t tlx;
+    fixed_t tly;
+    fixed_t lrx;
+    fixed_t lry;
     
-    /* Drawing data */
-    rect_point drawloc;
+    /* Drawing data, drawloc is relative to tl */
+    fixed_t drawlocx;
+    fixed_t drawlocy;
     SDL_Surface *img;
 
     /* Flags */
@@ -151,17 +162,18 @@ extern void register_player (int id, player plr);
 
 extern player *get_player (int id);
 
-extern void update_player (int id, player *plr);
-extern void update_pbullet (pbullet *pbul);
-extern int  collide_pbullet (pbullet pbul, bullet bul);
+extern inline void update_player (int id, player *plr);
+extern inline void update_pbullet (pbullet *pbul);
+extern inline int  collide_pbullet (pbullet *pbul, bullet *bul);
+extern void destroy_pbullet (pbullet *pbul);
 
 extern pbullet *make_pbullet (pbullet_type *type, fixed_t x, fixed_t y,
-                             fixed_t xvel, fixed_t yvel, int polar);
+                              fixed_t xvel, fixed_t yvel, int polar);
 
-extern void draw_player (player plr, SDL_Surface *surface,
-                         int center_x, int center_y);
-extern void draw_pbullet (pbullet pbul, SDL_Surface *surface,
-                          int center_x, int center_y);
+extern inline void draw_player (player *plr, SDL_Surface *surface,
+                                int center_x, int center_y);
+extern inline void draw_pbullet (pbullet *pbul, SDL_Surface *surface,
+                                 int center_x, int center_y);
 
 extern void reset_pbullets(void);
 
