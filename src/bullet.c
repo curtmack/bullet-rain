@@ -19,16 +19,9 @@
 /* Memory to use for bullets */
 bullet bullet_mem[8192];
 
-/* Memory to use for extended bullets */
-bullet_ext extended_mem[1024];
-
 bullet    *free_bullets_head;
 bullet    *free_bullets_tail;
 SDL_mutex *free_bullets_lock;
-
-bullet_ext *free_extended_head;
-bullet_ext *free_extended_tail;
-SDL_mutex  *free_extended_lock;
 
 /* 
  * Make a bullet 
@@ -137,7 +130,6 @@ void destroy_bullet(bullet *bul)
 int init_bullets(void)
 {
     free_bullets_lock = SDL_CreateMutex();
-    free_extended_lock = SDL_CreateMutex();
     reset_bullets();
     
     return 0;
@@ -168,23 +160,6 @@ void reset_bullets(void)
     
     r = SDL_mutexV(free_bullets_lock);
     check_mutex(r);
-    
-    /* Now to do the same thing with the extended blocks */
-    r = SDL_mutexP(free_extended_lock);
-    check_mutex(r);
-    
-    /* This loop links the entire array to itself */
-    free_extended_head = extended_mem;
-    free_extended_tail = free_extended_head;
-    for (i = 1; i < 1023; ++i) {
-        free_extended_tail->next = &extended_mem[i];
-        free_extended_tail = free_extended_tail->next;
-    }
-    /* And this finishes it off */
-    free_extended_tail->next = NULL;
-    
-    r = SDL_mutexV(free_extended_lock);
-    check_mutex(r);
 }
 
 /* Destroys all bullets and the linked lists */
@@ -198,7 +173,6 @@ void stop_bullets(void)
      */
     
     SDL_DestroyMutex(free_bullets_lock);
-    SDL_DestroyMutex(free_extended_lock);
 }
 
 inline void draw_bullet(bullet *bul, SDL_Surface *screen, int center_x, int center_y)

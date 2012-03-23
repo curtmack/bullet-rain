@@ -206,17 +206,10 @@ struct bullet_type_ {
 /* Memory to use for bullets */
 extern bullet bullet_mem[8192];
 
-/* Memory to use for extended bullets */
-extern bullet_ext extended_mem[1024];
-
 /* Linked list of free bullet / extended block space */
 extern bullet    *free_bullets_head;
 extern bullet    *free_bullets_tail;
 extern SDL_mutex *free_bullets_lock;
-
-extern bullet_ext *free_extended_head;
-extern bullet_ext *free_extended_tail;
-extern SDL_mutex  *free_extended_lock;
 
 extern bullet *make_bullet(float locx, float locy,
                            float velx, float vely, bullet_type *type);
