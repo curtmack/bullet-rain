@@ -21,13 +21,13 @@
 /* All of these functions return TRUE on collision and FALSE on miss */
 
 /* point, point, sum of the radii squared */
-extern int circle_collide(fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by,
-                          fixed_t sors);
+extern int circle_collide(float ax, float ay, float bx, float by,
+                          float sors);
 
 /* top-left point, lower-right point, top-left point, lower-right point */
-extern int aabb_collide(fixed_t tlax, fixed_t tlay,
-                        fixed_t lrax, fixed_t lray,
-                        fixed_t tlbx, fixed_t tlby,
-                        fixed_t lrbx, fixed_t lrby);
+extern int aabb_collide(float tlax, float tlay,
+                        float lrax, float lray,
+                        float tlbx, float tlby,
+                        float lrbx, float lrby);
 
 #endif /* !def COLLMATH_H */

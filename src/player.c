@@ -15,6 +15,7 @@
 #include "compile.h"
 #include "collmath.h"
 #include "coreship.h"
+#include "debug.h"
 #include "geometry.h"
 #include "player.h"
 
@@ -61,15 +62,15 @@ inline void update_pbullet (pbullet *pbul)
     pbul->lrx += pbul->velx;
     pbul->lry += pbul->vely;
     
-    if (pbul->tlx < tofixed(-400,0) || pbul->tly < tofixed(-400,0) ||
-        pbul->lrx > tofixed( 400,0) || pbul->lry > tofixed( 400,0)) {
+    if (pbul->tlx < -400.0F || pbul->tly < -400.0F ||
+        pbul->lrx >  400.0F || pbul->lry >  400.0F) {
         
         destroy_pbullet(pbul);
     }
 }
 
-pbullet *make_pbullet (pbullet_type *type, fixed_t x, fixed_t y,
-                       fixed_t xvel, fixed_t yvel, int polar)
+pbullet *make_pbullet (pbullet_type *type, float x, float y,
+                       float xvel, float yvel, int polar)
 {
     pbullet *pbul;
     int r;
@@ -131,7 +132,7 @@ void destroy_pbullet (pbullet *pbul)
     }
     
     r = SDL_mutexV(free_pbullets_lock);
-    check_mutex(r);    
+    check_mutex(r);
 }
 
 inline void draw_player (player *plr, SDL_Surface *surface,
@@ -139,8 +140,8 @@ inline void draw_player (player *plr, SDL_Surface *surface,
 {
     SDL_Rect rect;
     
-    rect.x = intpart(plr->centerx + plr->drawlocx) + center_x;
-    rect.y = intpart(plr->centery + plr->drawlocy) + center_y;
+    rect.x = (int)(plr->centerx + plr->drawlocx + center_x);
+    rect.y = (int)(plr->centery + plr->drawlocy + center_y);
     
     SDL_BlitSurface(plr->img, NULL, surface, &rect);
 }
@@ -151,8 +152,8 @@ inline void draw_pbullet (pbullet *pbul, SDL_Surface *surface,
     SDL_Rect rect;
     
     if (!pis_alive(pbul)) return;
-    rect.x = intpart(pbul->tlx + pbul->drawlocx) + center_x;
-    rect.y = intpart(pbul->tly + pbul->drawlocy) + center_y;
+    rect.x = (int)(pbul->tlx + pbul->drawlocx + center_x);
+    rect.y = (int)(pbul->tly + pbul->drawlocy + center_y);
     
     SDL_BlitSurface(pbul->img, NULL, surface, &rect);
 }

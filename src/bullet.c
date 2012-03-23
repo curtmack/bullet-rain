@@ -34,8 +34,8 @@ SDL_mutex  *free_extended_lock;
  * Make a bullet 
  * TODO: So much missing...
  */
-bullet *make_bullet(fixed_t locx, fixed_t locy,
-                    fixed_t velx, fixed_t vely, bullet_type *type)
+bullet *make_bullet(float locx, float locy,
+                    float velx, float vely, bullet_type *type)
 {
     bullet *newbullet;
     int r;
@@ -69,6 +69,11 @@ bullet *make_bullet(fixed_t locx, fixed_t locy,
     newbullet->extend = FALSE;
     newbullet->next = NULL;
     
+    newbullet->tlx += locx;
+    newbullet->tly += locy;
+    newbullet->lrx += locx;
+    newbullet->lry += locy;
+    
     return newbullet;
 }
 
@@ -98,9 +103,9 @@ inline int process_bullet(bullet *bul)
 }
 
 /* Check if the bullet is colliding with the given circle */
-inline int collide_bullet(bullet *bul, fixed_t px, fixed_t py, fixed_t rad)
+inline int collide_bullet(bullet *bul, float px, float py, float rad)
 {
-    fixed_t sors = fixmul(rad+bul->rad, rad+bul->rad); /* sum of radii squared */
+    float sors = (rad+bul->rad)*(rad+bul->rad); /* sum of radii squared */
     return circle_collide(bul->centerx, bul->centery, px, py, sors);
 }
 
@@ -201,8 +206,9 @@ inline void draw_bullet(bullet *bul, SDL_Surface *screen, int center_x, int cent
     SDL_Rect drawdst;
     
     if (!is_alive(bul)) return;
-    drawdst.x = intpart(bul->centerx + bul->drawlocx) + center_x;
-    drawdst.y = intpart(bul->centery + bul->drawlocy) + center_y;
+    drawdst.x = (int)(bul->centerx + bul->drawlocx + center_x);
+    drawdst.y = (int)(bul->centery + bul->drawlocy + center_y);
     /* w and h are immaterial */
+    
     SDL_BlitSurface(bul->img, NULL, screen, &drawdst);
 }

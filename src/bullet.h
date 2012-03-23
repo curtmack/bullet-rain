@@ -16,7 +16,6 @@
 #define BULLET_H
 
 #include "compile.h"
-#include "fixed.h"
 #include "geometry.h"
 #include "resource.h"
 
@@ -35,99 +34,78 @@ typedef struct bullet_     bullet;
 typedef struct bullet_ext_ bullet_ext;
 
 struct bullet_ {
-       /* Pointer to next bullet in chain */
-       bullet *next;
-
-       /* Pointer to parent (NULL if none) */
-       bullet *parent;
-
-       /* Coordinates of bullet */
-       fixed_t centerx;
-       fixed_t centery;
-
-       /*
-        * These next variables are in this order so they can be
-        * memcpy'd from a bullet_type
-        */
-
-       /* Dimensions of bullet */
-       fixed_t rad;
-
-       /* Texture */
-       SDL_Surface *img;
-       
-       /* Both engine and game-specific flags */
-       Uint32 flags;
-       Uint32 gameflags;
-       
-       /* Lua script resource */
-       resource *lua_script;
-
-       /* AABB information - relative from center */
-       fixed_t tlx;
-       fixed_t tly;
-       fixed_t lrx;
-       fixed_t lry;
-
-       /* Display data */
-       fixed_t drawlocx;
-       fixed_t drawlocy;
-       
-       /* That's all we memcpy over */
-
-       /* Velocity (rectangular and polar) */
-       fixed_t velx;
-       fixed_t vely;
-       fixed_t vel_mag;
-       angle_t vel_dir;
-
-       /* Extended pointer */
-       bullet_ext *extend;
-};
-
-struct bullet_ext_ {
-    /* Next free block */
-    bullet_ext *next;
+    /* Pointer to next bullet in chain */
+    bullet *next;
     
-	/* Animation data */
-	SDL_Surface *frames[32];
-
-	/* Scripting data */
-	/* script_instance script; */
-
-	/* Other data */
-	int32_t hp;
-	int32_t hp_max;
-
-	/* Game-specific data */
-	int32_t gamedata[16];
+    /* Pointer to parent (NULL if none) */
+    bullet *parent;
+    
+    /* Coordinates of bullet */
+    float centerx;
+    float centery;
+    
+    /*
+    * These next variables are in this order so they can be
+    * memcpy'd from a bullet_type
+    */
+    
+    /* Dimensions of bullet */
+    float rad;
+    
+    /* Texture */
+    SDL_Surface *img;
+    
+    /* Both engine and game-specific flags */
+    Uint32 flags;
+    Uint32 gameflags;
+    
+    /* AABB information - relative from center */
+    float tlx;
+    float tly;
+    float lrx;
+    float lry;
+    
+    /* Display data */
+    float drawlocx;
+    float drawlocy;
+    
+    /* That's all we memcpy over */
+    
+    int32_t hp;
+    int32_t hp_max;
+    
+    /* Velocity (rectangular and polar) */
+    float velx;
+    float vely;
+    float vel_mag;
+    float vel_dir;
+    
+    /* Extended pointer */
+    bullet_ext *extend;
 };
 
 /* Bullet type information */
 typedef struct bullet_type_ bullet_type;
 struct bullet_type_ {
-       /* Radius */
-       fixed_t rad;
-
-       /* Texture */
-       SDL_Surface *img;
-
-       /* Flags */
-       Uint32 flags;
-       Uint32 gameflags;
-
-       /* Lua script */
-       resource *lua;
-
-       /* AABB information - relative from center */
-       fixed_t tlx;
-       fixed_t tly;
-       fixed_t lrx;
-       fixed_t lry;
-
-       /* Display data */
-       fixed_t drawlocx;
-       fixed_t drawlocy;
+    /* Radius */
+    float rad;
+    
+    /* Texture */
+    SDL_Surface *img;
+    
+    /* Flags */
+    Uint32 flags;
+    Uint32 gameflags;
+    
+    /* AABB information - relative from center */
+    float tlx;
+    float tly;
+    float lrx;
+    float lry;
+    
+    /* Display data */
+    float drawlocx;
+    float drawlocy;
 };
 
 /* Defines for bitfield in bullet->flags */
@@ -240,11 +218,11 @@ extern bullet_ext *free_extended_head;
 extern bullet_ext *free_extended_tail;
 extern SDL_mutex  *free_extended_lock;
 
-extern bullet *make_bullet(fixed_t locx, fixed_t locy,
-                           fixed_t velx, fixed_t vely, bullet_type *type);
+extern bullet *make_bullet(float locx, float locy,
+                           float velx, float vely, bullet_type *type);
 
 extern inline int process_bullet(bullet *bul);
-extern inline int collide_bullet(bullet *bul, fixed_t px, fixed_t py, fixed_t rad);
+extern inline int collide_bullet(bullet *bul, float px, float py, float rad);
 
 extern void destroy_bullet(bullet *bul);
 
@@ -261,7 +239,7 @@ extern inline void draw_bullet(bullet *bul, SDL_Surface *screen,
                                int center_x, int center_y);
 
 /* The extents of the squares at which bullets disappear */
-#define OUT_OF_BOUNDS      tofixed(400,0)
-#define OUT_OF_BOUNDS_WIDE tofixed(800,0)
+#define OUT_OF_BOUNDS      400.0F
+#define OUT_OF_BOUNDS_WIDE 800.0F
 
 #endif /* !def BULLET_H */

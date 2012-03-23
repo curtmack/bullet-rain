@@ -41,8 +41,6 @@ int init_all(void)
     init_bullets();
     init_player();
     
-    atexit(stop_all);
-    
     return 0;
 }
 

@@ -11,82 +11,13 @@
  * Contains code for working with angles and points
  */
 
-#include "fixed.h"
+#include "compile.h"
 #include "geometry.h"
+#include <math.h>
 
-/* Precalculated tables */
-
-const fixed_t sines[16] = {
-    /*   0 */ tofixed(0,0),      /*  0.00000 */
-    /*  16 */ tofixed(0,25080),  /*  0.38268 */
-    /*  32 */ tofixed(0,46341),  /*  0.70710 */
-    /*  48 */ tofixed(0,60547),  /*  0.92387 */
-    /*  64 */ tofixed(1,0),      /*  1.00000 */
-    /*  80 */ tofixed(0,60547),  /*  0.92387 */
-    /*  96 */ tofixed(0,46341),  /*  0.70710 */
-    /* 112 */ tofixed(0,25080),  /*  0.38268 */
-    /* 128 */ tofixed(0,0),      /*  0.00000 */
-    /* 144 */ tofixed(0,-25080), /* -0.38268 */
-    /* 160 */ tofixed(0,-46341), /* -0.70710 */
-    /* 176 */ tofixed(0,-60547), /* -0.92387 */
-    /* 192 */ tofixed(-1,0),     /* -1.00000 */
-    /* 208 */ tofixed(0,-60547), /* -0.92387 */
-    /* 224 */ tofixed(0,-46341), /* -0.70710 */
-    /* 240 */ tofixed(0,-25080), /* -0.38268 */
-};
-
-const fixed_t cosines[16] = {
-    /*   0 */ tofixed(1,0),      /*  1.00000 */
-    /*  16 */ tofixed(0,60547),  /*  0.92387 */
-    /*  32 */ tofixed(0,46341),  /*  0.70710 */
-    /*  48 */ tofixed(0,25080),  /*  0.38268 */
-    /*  64 */ tofixed(0,0),      /*  0.00000 */
-    /*  80 */ tofixed(0,-25080), /* -0.38268 */
-    /*  96 */ tofixed(0,-46341), /* -0.70710 */
-    /* 112 */ tofixed(0,-60547), /* -0.92387 */
-    /* 128 */ tofixed(-1,0),     /* -1.00000 */
-    /* 144 */ tofixed(0,-60547), /* -0.92387 */
-    /* 160 */ tofixed(0,-46341), /* -0.70710 */
-    /* 176 */ tofixed(0,-25080), /* -0.38268 */
-    /* 192 */ tofixed(0,0),      /*  0.00000 */
-    /* 208 */ tofixed(0,25080),  /*  0.38268 */
-    /* 224 */ tofixed(0,46341),  /*  0.70710 */
-    /* 240 */ tofixed(0,60547),  /*  0.92387 */
-};
-
-fixed_t lookup_sin(angle_t ang)
-{
-    fixed_t l,h,d;
-    int idx;
-    
-    idx = (int)((ang & 0x00FFFFFF) >> 20);
-    
-    /* Takes a weighted average of the sines on either side */
-    l = sines[idx];
-    h = sines[(idx >= 15 ? 0 : idx+1)];
-    d = (fixed_t)((ang & 0x000FFFFF) >> 4);
-    
-    return fixmul(h,d)+fixmul(l,((fixed_t)0x00010000)-d);
-}
-
-fixed_t lookup_cos(angle_t ang)
-{
-    fixed_t l,h,d;
-    int idx;
-    
-    idx = (int)((ang & 0x00FFFFFF) >> 20);
-    
-    /* Takes a weighted average of the cosines on either side */
-    l = cosines[idx];
-    h = cosines[(idx >= 15 ? 0 : idx+1)];
-    d = (fixed_t)((ang & 0x000FFFFF) >> 4);
-    
-    return fixmul(h,d)+fixmul(l,((fixed_t)0x00010000)-d);
-}
-
-void polar_to_rect(fixed_t pr, angle_t pt, fixed_t *x, fixed_t *y)
+void polar_to_rect(float pr, float pt, float *x, float *y)
 {
     /* Straightforward */
-    if (x != NULL) *x = fixmul(pr, lookup_cos(pt));
-    if (y != NULL) *y = fixmul(pr, lookup_sin(pt));
+    if (x != NULL) *x = pr * cos(pt);
+    if (y != NULL) *y = pr * sin(pt);
 }

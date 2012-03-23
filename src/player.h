@@ -29,13 +29,13 @@
 typedef struct player_ player;
 struct player_ {
     /* Location data */
-    fixed_t centerx;
-    fixed_t centery;
-    fixed_t rad;
+    float centerx;
+    float centery;
+    float rad;
 
     /* Drawing data */
-    fixed_t drawlocx;
-    fixed_t drawlocy;
+    float drawlocx;
+    float drawlocy;
     SDL_Surface *img;
 
     /* Flags */
@@ -56,20 +56,20 @@ struct pbullet_ {
     pbullet *next;
     
     /* Movement data */
-    fixed_t velx;
-    fixed_t vely;
-    fixed_t vel_mag;
-    fixed_t vel_dir;
+    float velx;
+    float vely;
+    float vel_mag;
+    float vel_dir;
     
     /* Hitbox data - note that pbullets use AABBs, not circles */
-    fixed_t tlx;
-    fixed_t tly;
-    fixed_t lrx;
-    fixed_t lry;
+    float tlx;
+    float tly;
+    float lrx;
+    float lry;
     
     /* Drawing data, drawloc is relative to tl */
-    fixed_t drawlocx;
-    fixed_t drawlocy;
+    float drawlocx;
+    float drawlocy;
     SDL_Surface *img;
 
     /* Flags */
@@ -93,14 +93,14 @@ struct pbullet_type_ {
      * even though the center point isn't technically a real thing
      */
     /* Hitbox data - note that pbullets use AABBs, not circles */
-    fixed_t tlx;
-    fixed_t tly;
-    fixed_t lrx;
-    fixed_t lry;
+    float tlx;
+    float tly;
+    float lrx;
+    float lry;
     
     /* Drawing data, drawloc is relative to tl */
-    fixed_t drawlocx;
-    fixed_t drawlocy;
+    float drawlocx;
+    float drawlocy;
     SDL_Surface *img;
 
     /* Flags */
@@ -167,8 +167,8 @@ extern inline void update_pbullet (pbullet *pbul);
 extern inline int  collide_pbullet (pbullet *pbul, bullet *bul);
 extern void destroy_pbullet (pbullet *pbul);
 
-extern pbullet *make_pbullet (pbullet_type *type, fixed_t x, fixed_t y,
-                              fixed_t xvel, fixed_t yvel, int polar);
+extern pbullet *make_pbullet (pbullet_type *type, float x, float y,
+                              float xvel, float yvel, int polar);
 
 extern inline void draw_player (player *plr, SDL_Surface *surface,
                                 int center_x, int center_y);

@@ -20,7 +20,6 @@
 #include "bullet.h"
 #include "coreship.h"
 #include "debug.h"
-#include "fixed.h"
 #include "geometry.h"
 #include "init.h"
 #include "input.h"
@@ -46,7 +45,7 @@
 #include "SDL_ttf.h"
 #endif
 
-void fixed_test(SDL_Surface *surface, TTF_Font *font);
+void floatest(SDL_Surface *surface, TTF_Font *font);
 void geom_test(SDL_Surface *surface, TTF_Font *font);
 void hash_test(SDL_Surface *surface, TTF_Font *font);
 void res_test(SDL_Surface *surface, TTF_Font *font);
@@ -56,28 +55,20 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font);
 void bull_test_collision(SDL_Surface *surface, TTF_Font *font);
 void player_test(SDL_Surface *surface, TTF_Font *font);
 
-#define TEST_MENU_SIZE 10
+#define TEST_MENU_SIZE 6
 
-#define TEST_FIXED     0
-#define TEST_GEOM      1
-#define TEST_HASH      2
-#define TEST_RES       3
-#define TEST_TIMER     4
-#define TEST_INPUT     5
-#define TEST_FAKEBULL  6
-#define TEST_COLLISION 7
-#define TEST_PLAYER    8
-#define TEST_QUIT      9
+#define TEST_TIMER     0
+#define TEST_INPUT     1
+#define TEST_FAKEBULL  2
+#define TEST_COLLISION 3
+#define TEST_PLAYER    4
+#define TEST_QUIT      5
 
 const char menu[TEST_MENU_SIZE][32] = {
-    "Fixed-point arithmetic test",
-    "Trigonometry test",
-    "String hashing test",
-    "Resource loader test",
     "60 hz timer test",
     "Input test",
-    "Bullet test - fake pipeline",
-    "Bullet test - collision",
+    "Bullet test",
+    "Collision test",
     "Player test",
     "Quit the system test"
 };
@@ -194,6 +185,7 @@ int _drawthread(void *data)
     brmenu *brm = (brmenu*)data;
     int r;
     
+    draw_stop = FALSE;
     while (!draw_stop) {
         r = SDL_mutexP(brm->_lock);
         check_mutex(r);
@@ -235,29 +227,15 @@ int main(int argc, char *argv[])
 
     while (!finished) {
         start_menu(brm);
-        draw_stop = FALSE;
         drawthread = SDL_CreateThread(&_drawthread, brm);
         while (brm->running == TRUE) {
             menu_action(brm, get_action());
             SDL_Delay(10);
         }
         
-        /* I'm sorry, it's just not working out. Friends? */
         draw_stop = TRUE;
         
         switch (brm->end) {
-            case TEST_FIXED:
-                fixed_test(screen, font);
-                break;
-            case TEST_GEOM:
-                geom_test(screen, font);
-                break;
-            case TEST_HASH:
-                hash_test(screen, font);
-                break;
-            case TEST_RES:
-                res_test(screen, font);
-                break;
             case TEST_TIMER:
                 timer_test(screen, font);
                 break;
@@ -285,531 +263,9 @@ int main(int argc, char *argv[])
     TTF_CloseFont(font);
     SDL_FreeSurface(screen);
     
+    stop_all();
+    
     return 0;
-}
-
-void fixed_test(SDL_Surface *surface, TTF_Font *font)
-{
-    int values[4] = {0, 0, 0, 0};
-    fixed_t a = fixzero, b = fixzero, result = fixzero;
-    
-    enum {
-        FIXED_TEST_AI,
-        FIXED_TEST_AF,
-        FIXED_TEST_BI,
-        FIXED_TEST_BF,
-        FIXED_TEST_OP
-    } selected = FIXED_TEST_AI;
-    
-    enum {
-        FIXED_TEST_ADD,
-        FIXED_TEST_SUB,
-        FIXED_TEST_MUL,
-        FIXED_TEST_DIV
-    } op = FIXED_TEST_ADD;
-    
-    char buffer[32];
-    char numbuf[8] = "\0\0\0\0\0\0\0\0";
-    char entry[8] = "0\0\0\0\0\0\0\0";
-    int cursor = 1;
-    int len    = 1;
-    int i;
-    int update = TRUE;
-    int divzero = FALSE;
-    SDL_Surface *back, *tmp;
-    SDL_Rect rect;
-    SDL_Event event;
-    
-    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
-    
-    /* Start setting up background */
-    back = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h,
-                                surface->format->BitsPerPixel,
-                                surface->format->Rmask, surface->format->Gmask,
-                                surface->format->Bmask, surface->format->Amask);
-    
-    rectset(rect,0,0,surface->w,surface->h);
-    SDL_FillRect(back,&rect,bg);
-    
-    /* Draw in instructions */
-    tmp = TTF_RenderText_Solid(font, "Up/Down: Select number", off);
-    rectset(rect,0,back->h-(4*tmp->h),0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    tmp = TTF_RenderText_Solid(font, "Type selected number with keyboard", off);
-    rectset(rect,0,back->h-(3*tmp->h),0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    tmp = TTF_RenderText_Solid(font, "Choose operation with left/right", off);
-    rectset(rect,0,back->h-(2*tmp->h),0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    tmp = TTF_RenderText_Solid(font, "Escape: Exit to menu", off);
-    rectset(rect,0,back->h-tmp->h,0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    /*
-     * This isn't a menu because it would be difficult to get a brmenu
-     * to do what we need it to here
-     */
-    SDL_EnableUNICODE(1);
-    while (TRUE) {
-        /* Draw everything */
-        rectset(rect, 0, 0, 0, 0);
-        SDL_BlitSurface(back, NULL, surface, &rect);
-        
-        for (i = 0; i < 4; ++i) {
-            if (i == selected) {
-                /* Draw the cursor */
-                tmp = TTF_RenderText_Solid(font, "0", off);
-                rectset(rect,(tmp->w)*(cursor+4),i*tmp->h,tmp->w,tmp->h);
-                SDL_FillRect(surface, &rect,
-                        SDL_MapRGB(surface->format, 255, 0, 0)); /* red */
-                
-                /* Now draw the text */
-                switch (i) {
-                    case 0:
-                        sprintf(buffer, "ai: %s", entry);
-                        break;
-                    case 1:
-                        sprintf(buffer, "af: %s", entry);
-                        break;
-                    case 2:
-                        sprintf(buffer, "bi: %s", entry);
-                        break;
-                    case 3:
-                        sprintf(buffer, "bf: %s", entry);
-                        break;
-                }
-                SDL_FreeSurface(tmp);
-                tmp = TTF_RenderText_Solid(font, buffer, off);
-                rectset(rect, 0, i*tmp->h, 0, 0);
-                SDL_BlitSurface(tmp, NULL, surface, &rect);
-                SDL_FreeSurface(tmp);
-            }
-            else {
-                /* Just draw it */
-                itoa(values[i], numbuf, 10);
-                switch (i) {
-                    case 0:
-                        sprintf(buffer, "ai: %s", numbuf);
-                        break;
-                    case 1:
-                        sprintf(buffer, "af: %s", numbuf);
-                        break;
-                    case 2:
-                        sprintf(buffer, "bi: %s", numbuf);
-                        break;
-                    case 3:
-                        sprintf(buffer, "bf: %s", numbuf);
-                        break;
-                }
-                tmp = TTF_RenderText_Solid(font, buffer, off);
-                rectset(rect, 0, i*tmp->h, 0, 0);
-                SDL_BlitSurface(tmp, NULL, surface, &rect);
-                SDL_FreeSurface(tmp);
-            }
-        }
-        
-        /* Draw the op */
-        if (selected == FIXED_TEST_OP) {
-            /* Draw a selection rectangle */
-            tmp = TTF_RenderText_Solid(font, "0", off);
-            rectset(rect,(tmp->w)*4,4*tmp->h,(tmp->w)*3,tmp->h);
-            SDL_FillRect(surface, &rect,
-                        SDL_MapRGB(surface->format, 255, 0, 0)); /* red */
-            SDL_FreeSurface(tmp);
-        }
-        switch (op) {
-            case FIXED_TEST_ADD:
-                tmp = TTF_RenderText_Solid(font, "op:  +", off);
-                break;
-            case FIXED_TEST_SUB:
-                tmp = TTF_RenderText_Solid(font, "op:  -", off);
-                break;
-            case FIXED_TEST_MUL:
-                tmp = TTF_RenderText_Solid(font, "op:  *", off);
-                break;
-            case FIXED_TEST_DIV:
-                tmp = TTF_RenderText_Solid(font, "op:  /", off);
-                break;
-        }
-        rectset(rect,0,4*tmp->h,0,0);
-        SDL_BlitSurface(tmp, NULL, surface, &rect);
-        SDL_FreeSurface(tmp);
-        
-        /* Draw the result */
-        sprintf(buffer, "result: (%d + %d/65536)", intpart(result), fracpart(result));
-        tmp = TTF_RenderText_Solid(font, buffer, off);
-        rectset(rect,surface->w - tmp->w, 0, 0, 0);
-        SDL_BlitSurface(tmp, NULL, surface, &rect);
-        SDL_FreeSurface(tmp);
-        
-        /* Draw division by zero warning */
-        if (divzero) {
-            tmp = TTF_RenderText_Solid(font, "Division by zero", on);
-            rectset(rect,surface->w - tmp->w, tmp->h, 0, 0);
-            SDL_BlitSurface(tmp, NULL, surface, &rect);
-            SDL_FreeSurface(tmp);
-        }
-        
-        /* Update the screen */
-        SDL_Flip(surface);
-        
-        SDL_WaitEvent(&event);
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_ESCAPE) {
-                break;
-            }
-            /* It's just simpler to check this first */
-            if (selected == FIXED_TEST_OP) {
-                switch (event.key.keysym.sym) {
-                    case SDLK_UP:
-                        selected = FIXED_TEST_BF;
-                        /* Set up the new selection */
-                        itoa(values[selected], entry, 10);
-                        len = strlen(entry);
-                        if (len > 5) {
-                            entry[5] = '\0';
-                            len = 5;
-                            cursor = 5;
-                        } 
-                        else {
-                            cursor = len;
-                        }
-                        update = TRUE;
-                        break;
-                    case SDLK_DOWN:
-                        selected = FIXED_TEST_AI;
-                        itoa(values[selected], entry, 10);
-                        len = strlen(entry);
-                        if (len > 5) {
-                            entry[5] = '\0';
-                            len = 5;
-                            cursor = 5;
-                        } 
-                        else {
-                            cursor = len;
-                        }
-                        update = TRUE;
-                        break;
-                    case SDLK_LEFT:
-                        if (op == FIXED_TEST_ADD) {
-                            op = FIXED_TEST_DIV;
-                        }
-                        else {
-                            --op;
-                        }
-                        break;
-                    case SDLK_RIGHT:
-                        if (op == FIXED_TEST_DIV) {
-                            op = FIXED_TEST_ADD;
-                        }
-                        else {
-                            ++op;
-                        }
-                        break;
-                    case SDLK_RETURN:
-                        /* Update without moving */
-                        update = TRUE;
-                        break;
-                    default:
-                        /* do nothing */
-                        break;
-                }
-            }
-            else {
-                /* We're in typing mode */
-                switch(event.key.keysym.sym) {
-                    case SDLK_UP:
-                    case SDLK_DOWN:
-                        /* 
-                         * These are mostly the same, set the new value
-                         * and then change selected
-                         * Up or down only matters at the end
-                         */
-                        /* Set new value */
-                        values[selected] = atoi(entry);
-                        
-                        /* Clear out entry */
-                        for (i = 0; i < 8; ++i) {
-                            entry[i] = '\0';
-                        }
-                        
-                        /* Go to next entry */
-                        if (event.key.keysym.sym == SDLK_UP) {
-                            if (selected == FIXED_TEST_AI) {
-                                selected = FIXED_TEST_OP;
-                            }
-                            else --selected;
-                        }
-                        else {
-                            /* If we had op selected, we wouldn't be here */
-                            ++selected;
-                        }
-                        
-                        /* Are we on an input row? */
-                        if (selected != FIXED_TEST_OP) {
-                            /* Set up the new selection */
-                            itoa(values[selected], entry, 10);
-                            len = strlen(entry);
-                            if (len > 5) {
-                                entry[5] = '\0';
-                                len = 5;
-                                cursor = 5;
-                            } 
-                            else {
-                                cursor = len;
-                            }
-                        }
-                        /* We're ready now */
-                        update = TRUE;
-                        break;
-                        
-                    case SDLK_RETURN:
-                        /* Update without moving */
-                        update = TRUE;                  
-                        break;
-                        
-                    case SDLK_LEFT:
-                        if (cursor > 0) {
-                            --cursor;
-                        }
-                        break;
-                    case SDLK_RIGHT:
-                        if (cursor < len && cursor < 4) {
-                            ++cursor;
-                        }
-                        break;
-                    
-                    case SDLK_BACKSPACE:
-                        /* tee hee i'm a clever pony */
-                        if (cursor > 0) --cursor;
-                        else break;
-                    case SDLK_DELETE:
-                        /* Bring everything over to the left */
-                        for (i = cursor; i < len; ++i) {
-                            entry[i] = entry[i+1];
-                        }
-                        break;
-                    default:
-                        /* 
-                         * Does it have a unicode component?
-                         * We need to check for this last because some
-                         * of the above characters have a unicode point
-                         * (e.g. '\b' for SDLK_BACKSPACE)
-                         */
-                        if (event.key.keysym.unicode != 0) {
-                            /* Only allow digits */
-                            if ((char)event.key.keysym.unicode >= '0' &&
-                                (char)event.key.keysym.unicode <= '9') {
-                                entry[cursor] = (char)event.key.keysym.unicode;
-                                if (cursor < 5) ++cursor;
-                                if (cursor > len) ++len;
-                                entry[len] = '\0';
-                            }
-                        }
-                        break;
-                }
-            }
-        }
-            
-        /* Do we need to update the math? */
-        if (update) {
-            a = tofixed(values[0], values[1]);
-            b = tofixed(values[2], values[3]);
-            switch (op) {
-                case FIXED_TEST_ADD:
-                    result = a+b;
-                    divzero = FALSE;
-                    break;
-                case FIXED_TEST_SUB:
-                    result = a-b;
-                    divzero = FALSE;
-                    break;
-                case FIXED_TEST_MUL:
-                    result = fixmul(a,b);
-                    divzero = FALSE;
-                    break;
-                case FIXED_TEST_DIV:
-                    result = fixdiv(a,b);
-                    if (b == fixzero) {
-                        divzero = TRUE;
-                    }
-                    else {
-                        divzero = FALSE;
-                    }
-                    break;
-            }
-            /* don't need to update again */
-            update = FALSE;
-        }
-        
-        /* Wait a bit */
-        SDL_Delay(20);
-        
-        /* And continue looping */
-    }
-    /* Disable unicode conversion */
-    SDL_EnableUNICODE(0);
-}
-
-void geom_test(SDL_Surface *surface, TTF_Font *font)
-{
-    angle_t ang;
-    fixed_t res;
-    double angd, resd, persec;
-    char buffer[40];
-    Uint32 starttime, geomtime, libctime;
-    int i, x, y, r;
-    SDL_Surface *back, *tmp;
-    SDL_Rect rect;
-    SDL_Event event;
-    
-    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
-    const Uint32 axes = SDL_MapRGB(surface->format, 255, 255, 255); /* white */
-    const Uint32 graph = SDL_MapRGB(surface->format, 255, 0, 0); /* red */
-    
-    const angle_t step = makeangle(0, 4096);
-    
-    /* Why doesn't cmath have this? */
-    const double pi = 3.141592653589793;
-    
-    /* Set up the background */
-    back = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h,
-                                surface->format->BitsPerPixel,
-                                surface->format->Rmask, surface->format->Gmask,
-                                surface->format->Bmask, surface->format->Amask);
-    
-    rectset(rect,0,0,surface->w,surface->h);
-    SDL_FillRect(back,&rect,bg);
-    
-    /* Draw in instructions */    
-    tmp = TTF_RenderText_Solid(font, "Escape: Exit to menu", off);
-    rectset(rect,0,back->h-tmp->h,0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    /* Draw in labels */
-    tmp = TTF_RenderText_Solid(font, "geometry.h", off);
-    rectset(rect,0,0,0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    tmp = TTF_RenderText_Solid(font, "cmath", off);
-    rectset(rect,back->w-tmp->w,0,0,0);
-    SDL_BlitSurface(tmp,NULL,back,&rect);
-    SDL_FreeSurface(tmp);
-    
-    /* Working on the graphs now */
-#define LEFT_GRAPH_START_X  10
-#define LEFT_GRAPH_START_Y  50
-#define RIGHT_GRAPH_START_X 330
-#define RIGHT_GRAPH_START_Y 50
-#define GRAPH_WIDTH   300
-#define GRAPH_HEIGHT  300
-
-    /* Draw axes */
-    rectset(rect, LEFT_GRAPH_START_X, LEFT_GRAPH_START_Y, 1, GRAPH_HEIGHT);
-    SDL_FillRect(back, &rect, axes);
-    rectset(rect, LEFT_GRAPH_START_X, LEFT_GRAPH_START_Y + GRAPH_HEIGHT/2,
-            GRAPH_WIDTH, 1);
-    SDL_FillRect(back, &rect, axes);
-    
-    rectset(rect, RIGHT_GRAPH_START_X, RIGHT_GRAPH_START_Y, 1, GRAPH_HEIGHT);
-    SDL_FillRect(back, &rect, axes);
-    rectset(rect, RIGHT_GRAPH_START_X, RIGHT_GRAPH_START_Y + GRAPH_HEIGHT/2,
-            GRAPH_WIDTH, 1);
-    SDL_FillRect(back, &rect, axes);
-    
-    /* Draw the graphs themselves */
-    for (ang = zeroangle; ang < maxangle; ang += step) {
-        res = lookup_sin(ang);
-        x = intpart(
-            fixmul((fixed_t)ang,
-            fixdiv(tofixed(GRAPH_WIDTH,0),(fixed_t)maxangle))
-            ) + LEFT_GRAPH_START_X;
-        y = intpart(
-            fixmul((fixed_t)res, tofixed(GRAPH_HEIGHT/2,0))
-            ) + LEFT_GRAPH_START_Y + GRAPH_HEIGHT/2;
-        /* No DrawPixel function, but a rect of size 1 is close enough */
-        rectset(rect, x, y, 1, 1);
-        SDL_FillRect(back, &rect, graph);
-        
-        /* 
-         * When we're timing, this lengthy conversion calculation will be
-         * unfair, so we'll generate double angles separately.
-         * But here, we don't really care.
-         */
-        angd = (double)(intpart(ang) + (fracpart(ang)/65536.0));
-        angd = angd * (2*pi) / 256.0;
-        resd = sin(angd);
-        x = angd * (GRAPH_WIDTH / (2*pi)) + RIGHT_GRAPH_START_X;
-        y = resd * (GRAPH_HEIGHT/2) + RIGHT_GRAPH_START_Y + GRAPH_HEIGHT/2;
-        rectset(rect,x,y,1,1);
-        SDL_FillRect(back, &rect, graph);
-    }
-    
-    /* Draw to the screen */
-    rectset(rect, 0, 0, 0, 0);
-    SDL_BlitSurface(back, NULL, surface, &rect);
-    SDL_Flip(surface);
-
-#define NUM_CALCULATIONS_INT    4000000
-#define NUM_CALCULATIONS_DOUBLE 4000000.0
-    
-    while (1) {
-        /* Start drawing */
-        rectset(rect, 0, 0, 0, 0);
-        SDL_BlitSurface(back, NULL, surface, &rect);
-        
-        /* Faster to count to a number than wait to a time */
-        starttime = SDL_GetTicks();
-        for (i = 0; i < NUM_CALCULATIONS_INT; ++i) {
-            ang = makeangle(rand()%1024,rand()%65536);
-            res = lookup_sin(ang);
-        }
-        geomtime = SDL_GetTicks() - starttime;
-        
-        /* 1000 milliseconds in a second */
-        persec = (NUM_CALCULATIONS_DOUBLE/geomtime) * 1000.0;
-        
-        sprintf(buffer, "%g per second", persec);
-        tmp = TTF_RenderText_Solid(font, buffer, off);
-        rectset(rect,0,tmp->h,0,0);
-        SDL_BlitSurface(tmp,NULL,surface,&rect);
-        SDL_FreeSurface(tmp);
-        
-        /* Same timing process for libc's sin */
-        starttime = SDL_GetTicks();
-        for (i = 0; i < NUM_CALCULATIONS_INT; ++i) {
-            /* This picks an angle in a reasonable range */
-            angd = (double)rand();
-            resd = sin(angd);
-        }
-        libctime = SDL_GetTicks() - starttime;
-        
-        persec = (NUM_CALCULATIONS_DOUBLE/libctime) * 1000.0;
-        
-        sprintf(buffer, "%g per second", persec);
-        tmp = TTF_RenderText_Solid(font, buffer, off);
-        rectset(rect,back->w-tmp->w,tmp->h,0,0);
-        SDL_BlitSurface(tmp,NULL,surface,&rect);
-        SDL_FreeSurface(tmp);
-        
-        /* Draw it */
-        SDL_Flip(surface);
-        
-        /* Should we quit? */
-        r = SDL_PollEvent(&event);
-        if (r && event.type == SDL_KEYDOWN &&
-            event.key.keysym.sym == SDLK_ESCAPE)
-            break;
-    }
 }
 
 void hash_test(SDL_Surface *surface, TTF_Font *font)
@@ -953,53 +409,6 @@ void hash_test(SDL_Surface *surface, TTF_Font *font)
     SDL_EnableUNICODE(0);
 }
 
-void print_res(resource *res)
-{
-    /*
-     * We're going to assume we'll never call this unless we know
-     * it's actually printable data
-     */
-    char *a = (char*) res->data;
-    Sint64 num = res->size;
-    int i, r;
-    
-    puts("-------BEGIN-------");
-    for (i = 0; i <= num; ++i) {
-        r = (a[i] <= 127);
-        warnn(r, "Character found that was not printable:", (int)a[i]);
-        warnn(r, "It was at location:", i);
-        if (r) putchar(a[i]);
-    }
-    puts("\n--------END--------");
-}
-
-void res_test(SDL_Surface *surface, TTF_Font *font)
-{
-    arclist *arc;
-    resource *res;
-    
-    puts("Loading res/test.tgz");
-    arc = load_arc("res/test.tgz");
-    puts("Loading successful!");
-    
-    puts("Printing contents of file chocolat.txt");
-    res = get_res("res/test.tgz", "chocolat.txt");
-    print_res(res);
-    
-    puts("Freeing archive");
-    free_arc("res/test.tgz");
-    puts("Archive freed!");
-    
-    puts("Getting resource at pocky.txt in a way that should cause a warning");
-    res = get_res("res/test.tgz", "pocky.txt");
-    
-    puts("Printing contents of file pocky.txt");
-    print_res(res);
-    
-    puts("Test done!");
-    puts("Leaving archive in memory.");
-}
-
 void timer_test(SDL_Surface *surface, TTF_Font *font)
 {
     Uint32 start_clock = clock_60hz();
@@ -1054,7 +463,7 @@ void timer_test(SDL_Surface *surface, TTF_Font *font)
 
 void input_test(SDL_Surface *surface, TTF_Font *font)
 {
-    fixed_t x = fixzero, y = fixzero;
+    float x = 0.0F, y = 0.0F;
     
     int temp_x, temp_y, i;
     
@@ -1070,7 +479,7 @@ void input_test(SDL_Surface *surface, TTF_Font *font)
 #define INPUT_TEST_LEFT  2
 #define INPUT_TEST_RIGHT 3
 
-#define INPUT_TEST_MOVESPEED tofixed(0,8192)
+#define INPUT_TEST_MOVESPEED 0.25F
     
     /* Get the sprite */
     lgsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
@@ -1228,8 +637,8 @@ void input_test(SDL_Surface *surface, TTF_Font *font)
         
         /* Draw the sprite */
         SDL_FillRect(surface, NULL, bg);
-        rect.x = intpart(x) + 320;
-        rect.y = intpart(y) + 240;
+        rect.x = (int)(x + 320);
+        rect.y = (int)(y + 240);
         SDL_BlitSurface(oursprite, NULL, surface, &rect);
         SDL_Flip(surface);
         
@@ -1246,7 +655,7 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
     bullet_type sm[12];
     bullet_type lg[12];
     
-    fixed_t velx, vely, px, py;
+    float velx, vely, px, py;
     
     int i, bullets_made = 0, numbullets = 0;
     Uint32 lasttime = SDL_GetTicks(), newtime, frametotal = 0;
@@ -1264,33 +673,36 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
     const Uint32 bg = SDL_MapRGB(&fmt, 0, 0, 32); /* dk.blue */
     const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
     
+    /* Clear all the bullets */
+    reset_bullets();
+    
     /* Get the resources we need */
     smsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "smbullet.png")->data);
     lgsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
     
     /* Make the bullet types */
     for (i = 0; i < 12; ++i) {
-        sm[i].rad       = tofixed(4, 0);
+        sm[i].rad       = 4.0F;
         sm[i].flags     = 0;
         sm[i].gameflags = 0;
         sm[i].lua       = NULL;
-        sm[i].tlx       = tofixed(-4,0);
-        sm[i].tly       = tofixed(-4,0);
-        sm[i].lrx       = tofixed(4,0);
-        sm[i].lry       = tofixed(4,0);
-        sm[i].drawlocx  = tofixed(-4,0);
-        sm[i].drawlocy  = tofixed(-4,0);
+        sm[i].tlx       = -4.0F;
+        sm[i].tly       = -4.0F;
+        sm[i].lrx       = 4.0F;
+        sm[i].lry       = 4.0F;
+        sm[i].drawlocx  = -4.0F;
+        sm[i].drawlocy  = -4.0F;
         
-        lg[i].rad       = tofixed(12, 0);
+        lg[i].rad       = 12.0F;
         lg[i].flags     = 0;
         lg[i].gameflags = 0;
         lg[i].lua       = NULL;
-        lg[i].tlx       = tofixed(-12,0);
-        lg[i].tly       = tofixed(-12,0);
-        lg[i].lrx       = tofixed(12,0);
-        lg[i].lry       = tofixed(12,0);
-        lg[i].drawlocx  = tofixed(-16,0);
-        lg[i].drawlocy  = tofixed(-16,0);
+        lg[i].tlx       = -12.0F;
+        lg[i].tly       = -12.0F;
+        lg[i].lrx       = 12.0F;
+        lg[i].lry       = 12.0F;
+        lg[i].drawlocx  = -16.0F;
+        lg[i].drawlocy  = -16.0F;
         
         /* Now we need to get the images */
         switch (i) {
@@ -1503,10 +915,10 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
             }
             /* flooding screen with bullets is bad, hence the limit */
             else if (bullets_made < 12) {
-                px   = tofixed(rand()%640-320, rand()%65536-32768);
-                py   = tofixed(rand()%480-240, rand()%65536-32768);
-                velx = tofixed(rand()%4 - 2,   rand()%65536-32768);
-                vely = tofixed(rand()%4 - 2,   rand()%65536-32768);
+                px   = (rand()%40960-20480) / 64.0F;
+                py   = (rand()%30720-15360) / 64.0F;
+                velx = (rand()%256-128) / 64.0F;
+                vely = (rand()%256-128) / 64.0F;
                 if (rand()%2) {
                     if (make_bullet(px, py, velx, vely, &sm[rand()%12]) != NULL) {
                         ++numbullets;
@@ -1573,7 +985,7 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     bullet_type miss[2];
     bullet_type hit[2];
     
-    fixed_t velx, vely, px, py;
+    float px, py;
     
     int i, j, mouse_x, mouse_y;
     
@@ -1587,55 +999,58 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     const Uint32 bg = SDL_MapRGB(&fmt, 0, 0, 32); /* dk.blue */
     const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
     
+    /* Clear all the bullets */
+    reset_bullets();
+    
     /* Get the resources we need */
     smsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "smbullet.png")->data);
     lgsprite = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
     
     /* Make the bullet types */
     
-    miss[0].rad       = tofixed(4, 0);
+    miss[0].rad       = 4.0F;
     miss[0].flags     = 0;
     miss[0].gameflags = 0;
     miss[0].lua       = NULL;
-    miss[0].tlx       = tofixed(-4,0);
-    miss[0].tly       = tofixed(-4,0);
-    miss[0].lrx       = tofixed(4,0);
-    miss[0].lry       = tofixed(4,0);
-    miss[0].drawlocx  = tofixed(-4,0);
-    miss[0].drawlocy  = tofixed(-4,0);
+    miss[0].tlx       = -4.0F;
+    miss[0].tly       = -4.0F;
+    miss[0].lrx       = 4.0F;
+    miss[0].lry       = 4.0F;
+    miss[0].drawlocx  = -4.0F;
+    miss[0].drawlocy  = -4.0F;
     
-    hit[0].rad       = tofixed(4, 0);
+    hit[0].rad       = 4.0F;
     hit[0].flags     = 0;
     hit[0].gameflags = 0;
     hit[0].lua       = NULL;
-    hit[0].tlx       = tofixed(-4,0);
-    hit[0].tly       = tofixed(-4,0);
-    hit[0].lrx       = tofixed(4,0);
-    hit[0].lry       = tofixed(4,0);
-    hit[0].drawlocx  = tofixed(-4,0);
-    hit[0].drawlocy  = tofixed(-4,0);
+    hit[0].tlx       = -4.0F;
+    hit[0].tly       = -4.0F;
+    hit[0].lrx       = 4.0F;
+    hit[0].lry       = 4.0F;
+    hit[0].drawlocx  = -4.0F;
+    hit[0].drawlocy  = -4.0F;
     
-    miss[1].rad       = tofixed(12, 0);
+    miss[1].rad       = 12.0F;
     miss[1].flags     = 0;
     miss[1].gameflags = 1; /* we're cheating here, this means it's big */
     miss[1].lua       = NULL;
-    miss[1].tlx       = tofixed(-12,0);
-    miss[1].tly       = tofixed(-12,0);
-    miss[1].lrx       = tofixed(12,0);
-    miss[1].lry       = tofixed(12,0);
-    miss[1].drawlocx  = tofixed(-16,0);
-    miss[1].drawlocy  = tofixed(-16,0);
+    miss[1].tlx       = -12.0F;
+    miss[1].tly       = -12.0F;
+    miss[1].lrx       = 12.0F;
+    miss[1].lry       = 12.0F;
+    miss[1].drawlocx  = -16.0F;
+    miss[1].drawlocy  = -16.0F;
     
-    hit[1].rad       = tofixed(12, 0);
+    hit[1].rad       = 12.0F;
     hit[1].flags     = 0;
     hit[1].gameflags = 1;
     hit[1].lua       = NULL;
-    hit[1].tlx       = tofixed(-12,0);
-    hit[1].tly       = tofixed(-12,0);
-    hit[1].lrx       = tofixed(12,0);
-    hit[1].lry       = tofixed(12,0);
-    hit[1].drawlocx  = tofixed(-16,0);
-    hit[1].drawlocy  = tofixed(-16,0);
+    hit[1].tlx       = -12.0F;
+    hit[1].tly       = -12.0F;
+    hit[1].lrx       = 12.0F;
+    hit[1].lry       = 12.0F;
+    hit[1].drawlocx  = -16.0F;
+    hit[1].drawlocy  = -16.0F;
         
     /* Now we need to get the images */
     
@@ -1673,18 +1088,14 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
      */
     for (i = 0; i < 12; ++i) {
         for (j = 0; j < 16; ++j) {
-            px   = fixmul(fixdiv(tofixed(640,0),tofixed(17,0)),tofixed(j+1,0));
-            px  -= tofixed(center_x,0);
-            py   = fixmul(fixdiv(tofixed(480,0),tofixed(13,0)),tofixed(i+1,0));
-            py  -= tofixed(center_y,0);
-            velx = fixzero;
-            vely = fixzero;
+            px   = (640.0F/17.0F)*(j+1) - center_x;
+            py   = (480.0F/13.0F)*(i+1) - center_y;
             
             if ((i+j) % 2 == 1) {
-                make_bullet(px, py, velx, vely, &miss[0]);
+                make_bullet(px, py, 0.0F, 0.0F, &miss[0]);
             }
             else {
-                make_bullet(px, py, velx, vely, &miss[1]);
+                make_bullet(px, py, 0.0F, 0.0F, &miss[1]);
             }
         }
     }
@@ -1698,15 +1109,15 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
         /* need this relative to the center */
         mouse_x -= center_x;
         mouse_y -= center_y;
-        px = tofixed(mouse_x, 0);
-        py = tofixed(mouse_y, 0);
+        px = (float) mouse_x;
+        py = (float) mouse_y;
         
         /* We may as well process all the bullets, most of them are gone */
         for (i = 0; i < 8192; ++i) {
             tmp = &bullet_mem[i];
             if (is_alive(tmp)) {
                 process_bullet(tmp);
-                if(collide_bullet(tmp, px, py, fixzero)) {
+                if(collide_bullet(tmp, px, py, 0.0F)) {
                     if(tmp->gameflags) {
                         tmp->img = hit[1].img;
                     }
@@ -1755,8 +1166,11 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
     pbullet *tmp;
     bullet *tmpb;
     int i,j;
-    fixed_t xvel, yvel;
-    angle_t dir;
+    int player_died = FALSE;
+    int deaths = 0;
+    float xvel, yvel;
+    float dir;
+    char deathstring[20];
     
 #define ENEMY_TIMER  120
 #define SHOT_A_TIMER 120
@@ -1770,22 +1184,23 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
     const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
     
     reset_pbullets();
+    reset_bullets();
     
     ship = make_coreship();
     setup_coreship(0);
-    ship.centerx = fixzero;
-    ship.centery = fixzero;
+    ship.centerx = 0.0F;
+    ship.centery = 0.0F;
     
     tempsrc = (SDL_Surface*)(get_res("res/brcore.tgz", "enemy.png")->data);
     SDL_SetColorKey(tempsrc, SDL_SRCCOLORKEY, colorkey);
     enemy.img = tempsrc;
-    enemy.drawlocx  = tofixed(-16,0);
-    enemy.drawlocy  = tofixed(-16,0);
-    enemy.rad       = tofixed(16, 0);
-    enemy.tlx       = tofixed(-16,0);
-    enemy.tly       = tofixed(-16,0);
-    enemy.lrx       = tofixed(16, 0);
-    enemy.lry       = tofixed(16, 0);
+    enemy.drawlocx  = -16.0F;
+    enemy.drawlocy  = -16.0F;
+    enemy.rad       = 16.0F;
+    enemy.tlx       = -16.0F;
+    enemy.tly       = -16.0F;
+    enemy.lrx       = 16.0F;
+    enemy.lry       = 16.0F;
     enemy.flags     = ENEMY;
     enemy.gameflags = 0;
     
@@ -1797,13 +1212,13 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
     SDL_BlitSurface(tempsrc, &rect, temp, NULL);
     SDL_SetColorKey(temp, SDL_SRCCOLORKEY, colorkey);
     shot_a.img = temp;
-    shot_a.drawlocx  = tofixed(-16,0);
-    shot_a.drawlocy  = tofixed(-16,0);
-    shot_a.rad       = tofixed(12, 0);
-    shot_a.tlx       = tofixed(-12,0);
-    shot_a.tly       = tofixed(-12,0);
-    shot_a.lrx       = tofixed(12, 0);
-    shot_a.lry       = tofixed(12, 0);
+    shot_a.drawlocx  = -16.0F;
+    shot_a.drawlocy  = -16.0F;
+    shot_a.rad       = 12.0F;
+    shot_a.tlx       = -12.0F;
+    shot_a.tly       = -12.0F;
+    shot_a.lrx       = 12.0F;
+    shot_a.lry       = 12.0F;
     shot_a.flags     = 0;
     shot_a.gameflags = 0;
     
@@ -1815,13 +1230,13 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
     SDL_BlitSurface(tempsrc, &rect, temp, NULL);
     SDL_SetColorKey(temp, SDL_SRCCOLORKEY, colorkey);
     shot_b.img = temp;
-    shot_b.drawlocx  = tofixed(-4,0);
-    shot_b.drawlocy  = tofixed(-4,0);
-    shot_b.rad       = tofixed(4, 0);
-    shot_b.tlx       = tofixed(-4,0);
-    shot_b.tly       = tofixed(-4,0);
-    shot_b.lrx       = tofixed(4, 0);
-    shot_b.lry       = tofixed(4, 0);
+    shot_b.drawlocx  = -4.0F;
+    shot_b.drawlocy  = -4.0F;
+    shot_b.rad       = 4.0F;
+    shot_b.tlx       = -4.0F;
+    shot_b.tly       = -4.0F;
+    shot_b.lrx       = 4.0F;
+    shot_b.lry       = 4.0F;
     shot_b.flags     = 0;
     shot_b.gameflags = 0;
     
@@ -1875,6 +1290,7 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
         --next_shot_b_timer;
         if (next_shot_b_timer < 0) next_shot_b_timer = SHOT_B_TIMER;
         
+        player_died = FALSE;
         /* Update all the bullets */
         for (i = 0; i < 8192; ++i) {
             tmpb = &bullet_mem[i];
@@ -1896,50 +1312,65 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
                     /* Check if we're supposed to fire */
                     if (is_alive(tmpb) && tmpb->velx > 0 && next_shot_a_timer == 0) {
                         /* Shooting off a bullet in all 8 directions */
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    tofixed( 1, 32768), 0, &shot_a);
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    tofixed(-1,-32768), 0, &shot_a);
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    0, tofixed( 1, 32768), &shot_a);
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    0, tofixed(-1,-32768), &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                     1.5F,  0.0F, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                    -1.5F,  0.0F, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                     0.0F,  1.5F, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                     0.0F, -1.5F, &shot_a);
                                     
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    tofixed( 1, 4183), tofixed( 1, 4183), &shot_a);
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    tofixed(-1,-4183), tofixed( 1, 4183), &shot_a);
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    tofixed( 1, 4183), tofixed(-1,-4183), &shot_a);
-                        make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
-                                    tofixed(-1,-4183), tofixed(-1,-4183), &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                     1.064F,  1.064F, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                    -1.064F,  1.064F, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                     1.064F, -1.064F, &shot_a);
+                        make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
+                                    -1.064F, -1.064F, &shot_a);
                     }
                     if (is_alive(tmpb) && tmpb->velx < 0 && next_shot_b_timer == 0) {
                         /* Shooting off 6 bullets in random directions */
                         for (j = 0; j < 6; ++j) {
                             /* Gives a random angle in the valid range */
-                            dir = (rand()%1024 << 14);
-                            polar_to_rect(fixone, dir, &xvel, &yvel);
-                            make_bullet(tmpb->centerx, tmpb->centery + tofixed(8,0),
+                            dir = (rand()%92160)/256.0F;
+                            polar_to_rect(1.0F, dir, &xvel, &yvel);
+                            make_bullet(tmpb->centerx, tmpb->centery + 8.0F,
                                         xvel, yvel, &shot_b);
                         }
                     }
                 }
                 
+                /* Did we hit the player? */
+                if (!player_died && is_alive(tmpb) &&
+                    collide_bullet(tmpb, ship.centerx, ship.centery, ship.rad)) {
+                    
+                    player_died = TRUE;
+                    ++deaths;
+                    ship.centerx = 0.0F;
+                    ship.centery = 0.0F;
+                    /* Kill the bullet so we don't respawn on it */
+                    set_alive(tmpb,FALSE);
+                }
+                
                 /* Draw */
-                /* if (is_alive(tmpb)) { */
+                if (is_alive(tmpb)) {
                     draw_bullet(tmpb, surface, 320, 240);
-                /* } */
+                }
             }
         }
         
         /* Check if we need to make more enemies */
         if (next_enemy_timer == 0) {
-            make_bullet(tofixed(-360,0), tofixed(-120,0), tofixed(1,8192), 0,
-                        &enemy);
-            make_bullet(tofixed(360,0), tofixed(-180,0), tofixed(-1,-8192), 0,
-                        &enemy);
+            make_bullet(-360.0F, -120.0F, 1.25F, 0, &enemy);
+            make_bullet(360.0F, -180.0F, -1.25F, 0, &enemy);
         }
+        
+        /* Display death counter */
+        sprintf(deathstring, "Deaths: %d", deaths);
+        temp = TTF_RenderText_Solid(font, deathstring, off);
+        SDL_BlitSurface(temp, NULL, surface, NULL);
         
         /* Flip the screen */
         SDL_Flip(surface);
