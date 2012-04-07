@@ -33,36 +33,28 @@
 
 /* Size of hash map used to store resources */
 #define ARCLIST_HASH_SIZE 1024
-/* Size of hash map used to store config entries */
-#define CONFIG_HASH_SIZE  1024
-
-/* 
- * Profile code using shinyprofiler
- * See README for information setting this up
- */
-/* #define USE_PROFILE */
-
-/* Compile system tests rather than the usual main() */
-#define SYSTEM_TEST
 
 /* Include "SDL/SDL_***.h" instead of "SDL_***.h", needed on e.g. Ubuntu */
 #define INCLUDE_SDL_PREFIX
 
 /* Version string */
-#define ENGINE_VERSION "0.0.1"
+#define ENGINE_VERSION "0.2"
 /* padded with nulls to 16 chars */
-#define ENGINE_VERSION_16 "0.0.1\0\0\0\0\0\0\0\0\0\0\0\0"
+#define ENGINE_VERSION_16 "0.2\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
 /* 
  * Some compilers don't provide these for some reason?
  * Also if you're using some alien version of C I suppose you could change
  * these to whatever your bizarre extraterrestrial compiler needs
- * Change the #if 1 to a 0 if you don't need these (usually you get a
- * warning for redefining these if you already have them)
  */
-#if 1
+#ifndef TRUE
 #define TRUE  1
+#endif
+#ifndef FALSE
 #define FALSE 0
+#endif
+#ifndef NULL
+#define NULL  0
 #endif
 
 #endif /* !def COMPILE_H */
