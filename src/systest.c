@@ -27,6 +27,7 @@
 #include "player.h"
 #include "resource.h"
 #include "timer.h"
+#include "scripts.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -54,15 +55,17 @@ void input_test(SDL_Surface *surface, TTF_Font *font);
 void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font);
 void bull_test_collision(SDL_Surface *surface, TTF_Font *font);
 void player_test(SDL_Surface *surface, TTF_Font *font);
+void partial_scripts_test(SDL_Surface *surface, TTF_Font *font);
 
-#define TEST_MENU_SIZE 6
+#define TEST_MENU_SIZE 7
 
 #define TEST_TIMER     0
 #define TEST_INPUT     1
 #define TEST_FAKEBULL  2
 #define TEST_COLLISION 3
 #define TEST_PLAYER    4
-#define TEST_QUIT      5
+#define TEST_SCR_PART  5
+#define TEST_QUIT      6
 
 const char menu[TEST_MENU_SIZE][32] = {
     "60 hz timer test",
@@ -70,6 +73,7 @@ const char menu[TEST_MENU_SIZE][32] = {
     "Bullet test",
     "Collision test",
     "Player test",
+    "Scripts test (partial)",
     "Quit the system test"
 };
     
@@ -250,6 +254,9 @@ int main(int argc, char *argv[])
                 break;
             case TEST_PLAYER:
                 player_test(screen, font);
+                break;
+            case TEST_SCR_PART:
+                partial_scripts_test(screen, font);
                 break;
             case TEST_QUIT:
                 finished = TRUE;
@@ -685,7 +692,6 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
         sm[i].rad       = 4.0F;
         sm[i].flags     = 0;
         sm[i].gameflags = 0;
-        sm[i].lua       = NULL;
         sm[i].tlx       = -4.0F;
         sm[i].tly       = -4.0F;
         sm[i].lrx       = 4.0F;
@@ -696,7 +702,6 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
         lg[i].rad       = 12.0F;
         lg[i].flags     = 0;
         lg[i].gameflags = 0;
-        lg[i].lua       = NULL;
         lg[i].tlx       = -12.0F;
         lg[i].tly       = -12.0F;
         lg[i].lrx       = 12.0F;
@@ -920,13 +925,13 @@ void bull_test_fake_proc(SDL_Surface *surface, TTF_Font *font)
                 velx = (rand()%256-128) / 64.0F;
                 vely = (rand()%256-128) / 64.0F;
                 if (rand()%2) {
-                    if (make_bullet(px, py, velx, vely, &sm[rand()%12]) != NULL) {
+                    if (make_bullet(px, py, velx, vely, &sm[rand()%12]) != -1) {
                         ++numbullets;
                         ++bullets_made;
                     }
                 }
                 else {
-                    if (make_bullet(px, py, velx, vely, &lg[rand()%12]) != NULL) {
+                    if (make_bullet(px, py, velx, vely, &lg[rand()%12]) != -1) {
                         ++numbullets;
                         ++bullets_made;
                     }
@@ -1011,7 +1016,6 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     miss[0].rad       = 4.0F;
     miss[0].flags     = 0;
     miss[0].gameflags = 0;
-    miss[0].lua       = NULL;
     miss[0].tlx       = -4.0F;
     miss[0].tly       = -4.0F;
     miss[0].lrx       = 4.0F;
@@ -1022,7 +1026,6 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     hit[0].rad       = 4.0F;
     hit[0].flags     = 0;
     hit[0].gameflags = 0;
-    hit[0].lua       = NULL;
     hit[0].tlx       = -4.0F;
     hit[0].tly       = -4.0F;
     hit[0].lrx       = 4.0F;
@@ -1032,8 +1035,7 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     
     miss[1].rad       = 12.0F;
     miss[1].flags     = 0;
-    miss[1].gameflags = 1; /* we're cheating here, this means it's big */
-    miss[1].lua       = NULL;
+    miss[1].gameflags = 1; /* this means it's big */
     miss[1].tlx       = -12.0F;
     miss[1].tly       = -12.0F;
     miss[1].lrx       = 12.0F;
@@ -1044,7 +1046,6 @@ void bull_test_collision(SDL_Surface *surface, TTF_Font *font)
     hit[1].rad       = 12.0F;
     hit[1].flags     = 0;
     hit[1].gameflags = 1;
-    hit[1].lua       = NULL;
     hit[1].tlx       = -12.0F;
     hit[1].tly       = -12.0F;
     hit[1].lrx       = 12.0F;
@@ -1381,6 +1382,117 @@ void player_test(SDL_Surface *surface, TTF_Font *font)
         }
         last_clock_tick = clock_60hz();
     }
+}
+
+void partial_scripts_test(SDL_Surface *surface, TTF_Font *font)
+{
+    SDL_Event event;
+    Uint32 last_clock_tick;
+    SDL_Surface *temp, *tempsrc;
+    SDL_PixelFormat *fmt;
+    SDL_Rect rect;
+    bullet_type shot;
+    bullet *tmpb;
+    int i, id;
+    
+#define BULLET_DELAY 60
+    int bullet_timer = 0;
+
+    const Uint32 bg = SDL_MapRGB(surface->format, 0, 0, 32); /* dk.blue */
+    const Uint32 colorkey = SDL_MapRGBA(surface->format, 255, 0, 255, SDL_ALPHA_OPAQUE);
+    
+    tempsrc = (SDL_Surface*)(get_res("res/brcore.tgz", "lgbullet.png")->data);
+    fmt = tempsrc->format;
+    temp = SDL_CreateRGBSurface(SDL_SWSURFACE,32,32,fmt->BitsPerPixel,
+                                fmt->Rmask,fmt->Gmask,fmt->Bmask,fmt->Amask);
+    rectset(rect, 64, 32, 32, 32);
+    SDL_BlitSurface(tempsrc, &rect, temp, NULL);
+    SDL_SetColorKey(temp, SDL_SRCCOLORKEY, colorkey);
+    shot.img = temp;
+    shot.drawlocx  = -16.0F;
+    shot.drawlocy  = -16.0F;
+    shot.rad       = 12.0F;
+    shot.tlx       = -12.0F;
+    shot.tly       = -12.0F;
+    shot.lrx       = 12.0F;
+    shot.lry       = 12.0F;
+    shot.flags     = 0;
+    shot.gameflags = 0;
+    
+    init_scripts();
+    set_runner(get_res("res/brcore.tgz", "runner.lua"));
+    set_header(NULL);
+    set_main(get_res("res/brcore.tgz", "test.lua"));
+    load_scripts();
+    
+    last_clock_tick = clock_60hz();
+    
+    while (TRUE) {
+        /* Check for events */
+        if (SDL_PollEvent(&event)) {
+            /* Check for escape */
+            if (event.type == SDL_KEYDOWN &&
+                event.key.keysym.sym == SDLK_ESCAPE) {
+                break;
+            }
+        }
+        
+        /* Blank out the screen */
+        SDL_FillRect(surface, NULL, bg);
+        
+        /* Fire new bullets */
+        if (bullet_timer <= 0) {
+            bullet_timer = BULLET_DELAY;
+            
+            id = make_bullet(0.0F, 0.0F,  5.0F,  0.0F, &shot);
+            add_bullet(id, "reversing_bullet");
+            id = make_bullet(0.0F, 0.0F, -5.0F,  0.0F, &shot);
+            add_bullet(id, "reversing_bullet");
+            id = make_bullet(0.0F, 0.0F,  0.0F,  5.0F, &shot);
+            add_bullet(id, "reversing_bullet");
+            id = make_bullet(0.0F, 0.0F,  0.0F, -5.0F, &shot);
+            add_bullet(id, "reversing_bullet");
+            
+            id = make_bullet(0.0F, 0.0F, -3.536F, -3.536F, &shot);
+            add_bullet(id, "reversing_bullet");
+            id = make_bullet(0.0F, 0.0F, -3.536F,  3.536F, &shot);
+            add_bullet(id, "reversing_bullet");
+            id = make_bullet(0.0F, 0.0F,  3.536F,  3.536F, &shot);
+            add_bullet(id, "reversing_bullet");
+            id = make_bullet(0.0F, 0.0F,  3.536F, -3.536F, &shot);
+            add_bullet(id, "reversing_bullet");
+        }
+        else {
+            --bullet_timer;
+        }
+        
+        /* Update all the bullets */
+        for (i = 0; i < 8192; ++i) {
+            tmpb = &bullet_mem[i];
+            if (is_alive(tmpb)) {
+                process_bullet(tmpb);
+                
+                /* Draw */
+                if (is_alive(tmpb)) {
+                    draw_bullet(tmpb, surface, 320, 240);
+                }
+            }
+        }
+        
+        /* Run scripts */
+        exec_bullet_scripts();
+        
+        /* Flip the screen */
+        SDL_Flip(surface);
+        
+        /* Wait for next clock tick */
+        while (last_clock_tick == clock_60hz()) {
+            SDL_Delay(1);
+        }
+        last_clock_tick = clock_60hz();
+    }
+    
+    stop_scripts();
 }
 
 #endif /* def SYSTEM_TEST */

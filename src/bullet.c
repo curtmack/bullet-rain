@@ -27,8 +27,8 @@ SDL_mutex *free_bullets_lock;
  * Make a bullet 
  * TODO: So much missing...
  */
-bullet *make_bullet(float locx, float locy,
-                    float velx, float vely, bullet_type *type)
+int make_bullet(float locx, float locy, float velx, float vely,
+                bullet_type *type)
 {
     bullet *newbullet;
     int r;
@@ -41,7 +41,7 @@ bullet *make_bullet(float locx, float locy,
         warn(FALSE, "Out of bullet memory!");
         r = SDL_mutexV(free_bullets_lock);
         check_mutex(r);
-        return NULL;
+        return -1;
     }
     
     newbullet = free_bullets_head;
@@ -59,7 +59,6 @@ bullet *make_bullet(float locx, float locy,
     newbullet->vely = vely;
     newbullet->centerx = locx;
     newbullet->centery = locy;
-    newbullet->extend = FALSE;
     newbullet->next = NULL;
     
     newbullet->tlx += locx;
@@ -67,7 +66,7 @@ bullet *make_bullet(float locx, float locy,
     newbullet->lrx += locx;
     newbullet->lry += locy;
     
-    return newbullet;
+    return newbullet - bullet_mem;
 }
 
 /* 

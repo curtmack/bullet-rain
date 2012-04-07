@@ -186,7 +186,7 @@ arclist *load_arc(char *arcname)
 {
     int i, r;
     arclist *newarclist, *curr, *prev;
-    resource *newresource, *tempres, *prevres;
+    resource *newresource, *tempres, *prevres = NULL;
     sid_t reshash, temphash;
     void *tempdat;
     char *tempname;

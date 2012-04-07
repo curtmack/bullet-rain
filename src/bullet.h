@@ -143,63 +143,63 @@ struct bullet_type_ {
  * so we're not losing too much sleep over it
  */
 
-#define get_block(bul)     (bul->flags & BLOCK)
-#define set_block(bul,blk) (bul->flags = (bul->flags&!BLOCK) | blk)
+#define get_block(bul)     ((bul)->flags & BLOCK)
+#define set_block(bul,blk) ((bul)->flags = ((bul)->flags&!BLOCK) | blk)
 
-#define is_pinvalid(bul) (bul->flags & P_INVALID)
+#define is_pinvalid(bul) ((bul)->flags & P_INVALID)
 #define set_pinvalid(bul,cond) \
-(cond ? (bul->flags = bul->flags | P_INVALID) : \
-        (bul->flags = bul->flags & (!P_INVALID)))
+(cond ? ((bul)->flags = (bul)->flags | P_INVALID) : \
+        ((bul)->flags = (bul)->flags & (!P_INVALID)))
 
-#define is_enemy(bul) (bul->flags & ENEMY)
+#define is_enemy(bul) ((bul)->flags & ENEMY)
 #define set_enemy(bul,cond) \
-(cond ? (bul->flags = bul->flags | ENEMY) : \
-        (bul->flags = bul->flags & (!ENEMY)))
+(cond ? ((bul)->flags = (bul)->flags | ENEMY) : \
+        ((bul)->flags = (bul)->flags & (!ENEMY)))
 
-#define is_boss(bul) (bul->flags & BOSS)
+#define is_boss(bul) ((bul)->flags & BOSS)
 #define set_boss(bul,cond) \
-(cond ? (bul->flags = bul->flags | BOSS) : \
-        (bul->flags = bul->flags & (!BOSS)))
+(cond ? ((bul)->flags = (bul)->flags | BOSS) : \
+        ((bul)->flags = (bul)->flags & (!BOSS)))
 
-#define is_scripted(bul) (bul->flags & SCRIPTED)
+#define is_scripted(bul) ((bul)->flags & SCRIPTED)
 #define set_scripted(bul,cond) \
-(cond ? (bul->flags = bul->flags | SCRIPTED) : \
-        (bul->flags = bul->flags & (!SCRIPTED)))
+(cond ? ((bul)->flags = (bul)->flags | SCRIPTED) : \
+        ((bul)->flags = (bul)->flags & (!SCRIPTED)))
 
-#define is_bombproof(bul) (bul->flags & BOMBPROOF)
+#define is_bombproof(bul) ((bul)->flags & BOMBPROOF)
 #define set_bombproof(bul,cond) \
-(cond ? (bul->flags = bul->flags | BOMBPROOF) : \
-        (bul->flags = bul->flags & (!BOMBPROOF)))
+(cond ? ((bul)->flags = (bul)->flags | BOMBPROOF) : \
+        ((bul)->flags = (bul)->flags & (!BOMBPROOF)))
 
-#define is_anchored(bul) (bul->flags & ANCHOR_PARENT)
+#define is_anchored(bul) ((bul)->flags & ANCHOR_PARENT)
 #define set_anchored(bul,cond) \
-(cond ? (bul->flags = bul->flags | ANCHOR_PARENT) : \
-        (bul->flags = bul->flags & (!ANCHOR_PARENT)))
+(cond ? ((bul)->flags = (bul)->flags | ANCHOR_PARENT) : \
+        ((bul)->flags = (bul)->flags & (!ANCHOR_PARENT)))
 
-#define is_nocoll(bul) (bul->flags & NO_COLLIDE)
+#define is_nocoll(bul) ((bul)->flags & NO_COLLIDE)
 #define set_nocoll(bul,cond) \
-(cond ? (bul->flags = bul->flags | NO_COLLIDE) : \
-        (bul->flags = bul->flags & (!NO_COLLIDE)))
+(cond ? ((bul)->flags = (bul)->flags | NO_COLLIDE) : \
+        ((bul)->flags = (bul)->flags & (!NO_COLLIDE)))
 
-#define is_widestop(bul) (bul->flags & WIDE_STOP)
+#define is_widestop(bul) ((bul)->flags & WIDE_STOP)
 #define set_widestop(bul,cond) \
-(cond ? (bul->flags = bul->flags | WIDE_STOP) : \
-        (bul->flags = bul->flags & (!WIDE_STOP)))
+(cond ? ((bul)->flags = (bul)->flags | WIDE_STOP) : \
+        ((bul)->flags = (bul)->flags & (!WIDE_STOP)))
 
-#define is_killed(bul) (bul->flags & KILL_ME)
+#define is_killed(bul) ((bul)->flags & KILL_ME)
 #define set_killed(bul,cond) \
-(cond ? (bul->flags = bul->flags | KILL_ME) : \
-        (bul->flags = bul->flags & (!KILL_ME)))
+(cond ? ((bul)->flags = (bul)->flags | KILL_ME) : \
+        ((bul)->flags = (bul)->flags & (!KILL_ME)))
 
-#define is_rotate(bul) (bul->flags & ROTATE)
+#define is_rotate(bul) ((bul)->flags & ROTATE)
 #define set_rotate(bul,cond) \
-(cond ? (bul->flags = bul->flags | ROTATE) : \
-        (bul->flags = bul->flags & (!ROTATE)))
+(cond ? ((bul)->flags = (bul)->flags | ROTATE) : \
+        ((bul)->flags = (bul)->flags & (!ROTATE)))
 
-#define is_alive(bul) (bul->flags)
+#define is_alive(bul) ((bul)->flags)
 #define set_alive(bul,cond) \
-(cond ? (bul->flags = bul->flags | ALIVE) : \
-        (bul->flags = 0))
+(cond ? ((bul)->flags = (bul)->flags | ALIVE) : \
+        ((bul)->flags = 0))
 
 
 
@@ -211,8 +211,8 @@ extern bullet    *free_bullets_head;
 extern bullet    *free_bullets_tail;
 extern SDL_mutex *free_bullets_lock;
 
-extern bullet *make_bullet(float locx, float locy,
-                           float velx, float vely, bullet_type *type);
+extern int make_bullet(float locx, float locy, float velx, float vely,
+                       bullet_type *type);
 
 extern inline int process_bullet(bullet *bul);
 extern inline int collide_bullet(bullet *bul, float px, float py, float rad);

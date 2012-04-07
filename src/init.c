@@ -18,6 +18,7 @@
 #include "resource.h"
 #include "timer.h"
 #include "bullet.h"
+#include "scripts.h"
 
 #ifdef INCLUDE_SDL_PREFIX
 #include "SDL/SDL.h"
@@ -40,12 +41,14 @@ int init_all(void)
     init_inputs();
     init_bullets();
     init_player();
+    init_scripts();
     
     return 0;
 }
 
 void stop_all(void)
 {
+    stop_scripts();
     stop_player();
     stop_bullets();
     stop_inputs();

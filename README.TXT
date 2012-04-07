@@ -6,9 +6,9 @@ REQUIRED LIBRARIES:
    - SDL_image
    x SDL_mixer, which MUST be configured for OGG files
    - SDL_ttf
- x Lua
 
-(x means "Not actually used or required yet, but will be some day")
+(Lua is also used, however it is included in the source code and linked
+statically.)
 
 Note that you will need the development versions of these libraries to
 build the engine.
@@ -70,3 +70,13 @@ Your version of make will need to understand and accept / as a
 directory separator, even if that's not the native separator for your
 system. Alternatively, you can go through and fix them all yourself.
 This is left as an exercise to the reader.
+
+
+
+SOME NOTES:
+
+ - The Lua code included is modified to use float as LUA_NUMBER rather
+   than double. Do not change this, it will break many things.
+ - lua.c and luac.c have been omitted from the version of Lua in the
+   src directory. These are standalone programs, so it doesn't make
+   much sense to include them.
