@@ -1,3 +1,22 @@
+--------------------------------------------------------------------------------
+This code is a snapshot, frozen in time. It represents the portion of my college
+senior project that I was able to complete between 2011 and 2012. It is not a
+finished product, and likely never will be.
+
+I do not recommend using this code. It was the first time I had ever used C to
+build a large project, and my inexperience is apparent; were I to write this
+project today, it would look very different. There are probably a lot of bugs,
+many of which would require a significant rewrite to fix.
+
+There is some code in here that might be worth learning from - I think the menu
+system in particular would be quite serviceable in a larger project, although
+you should rewrite it to use a stack rather than explicit back functions - but
+otherwise, anything you see should be taken with a heap of salt. This is the
+code of an amateur, working under a deadline, with little direction or focus.
+
+ -- Curtis Mackie
+--------------------------------------------------------------------------------
+
 REQUIRED LIBRARIES:
 
  - C standard library
